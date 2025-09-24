@@ -178,7 +178,26 @@ export default function TestResultsPage() {
     );
   }
 
-  const correctAnswers = result.questionResults?.filter(q => q.isCorrect).length || 0;
+  const correctAnswers = result.questionResults?.filter(q => {
+    const normalize = (v: unknown) => {
+      if (v === null || v === undefined) return '';
+      if (typeof v === 'number') return String(v);
+      if (typeof v !== 'string') return String(v ?? '');
+      return v.trim().toLowerCase();
+    };
+    const mapTFNG = (v: string) => {
+      if (v === 'true' || v === 't') return 'true';
+      if (v === 'false' || v === 'f') return 'false';
+      if (v === 'not given' || v === 'notgiven' || v === 'ng' || v === 'n/a') return 'not given';
+      return v;
+    };
+    const user = normalize(q.userAnswer);
+    const correct = normalize(q.correctAnswer);
+    if (q.subType === 'true-false-not-given' || q.subType === 'tfng' || q.subType === 'true_false_not_given') {
+      return mapTFNG(user) === mapTFNG(correct);
+    }
+    return user === correct;
+  }).length || 0;
   const totalQuestions = result.questionResults?.length || 0;
   const averageTimePerQuestion = totalQuestions > 0 ? result.timeSpent / totalQuestions : 0;
 

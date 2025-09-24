@@ -54,22 +54,13 @@ import {
 import { authService } from '@/lib/auth';
 import { useRouter } from 'next/navigation';
 
-interface EmbeddedQuestion {
-  _id?: string;
+interface Question {
+  _id: string;
   number: number;
-  type:
-  | 'true-false-not-given'
-  | 'multiple-choice'
-  | 'matching-information'
-  | 'matching-headings'
-  | 'sentence-completion'
-  | 'summary-completion'
-  | 'short-answer';
+  type: string;
   prompt?: string;
   options?: string[];
-  points: number;
   paragraphRef?: string;
-  correctAnswer?: string;
 }
 
 interface Section {
@@ -80,18 +71,26 @@ interface Section {
     start: number;
     end: number;
   };
-  questions: EmbeddedQuestion[];
+  // Legacy inline questions (will not be sent in new payload)
+  questions: Question[];
+  // New fields for questionSections mapping
+  questionType?: string;
+  questionRange?: string; // e.g., "1-5"
 }
 
-interface BankQuestion {
+interface Question {
   _id: string;
-  type: 'reading' | 'listening' | 'writing';
-  subType: string;
-  question: string;
+  number: number;
+  type: string;
+  prompt?: string;
+  options?: string[];
   points: number;
-  difficulty: 'easy' | 'medium' | 'hard';
-  tags: string[];
-  createdBy: { firstName: string; lastName: string };
+  paragraphRef?: string;
+  // Additional fields for filtering UI and correctness (if present in API)
+  question?: string;
+  difficulty?: string;
+  tags?: string[];
+  correctAnswer?: string;
 }
 
 interface Passage {
@@ -101,8 +100,16 @@ interface Passage {
   type: 'reading' | 'listening';
   audioUrl?: string;
   duration?: number;
-  questions?: BankQuestion[];
-  sections?: Section[];
+  questions?: Question[]; // legacy
+  sections?: Section[]; // legacy UI editing support
+  questionSections?: {
+    _id?: string;
+    title: string;
+    instructions?: string;
+    questionType: string;
+    questionRange: string;
+    questions: string[];
+  }[];
   createdBy: {
     _id: string;
     firstName: string;
@@ -119,7 +126,7 @@ const passageTypes = [
 export default function PassagesPage() {
   const router = useRouter();
   const [passages, setPassages] = useState<Passage[]>([]);
-  const [questions, setQuestions] = useState<BankQuestion[]>([]);
+  const [questions, setQuestions] = useState<Question[]>([]);
   const [loading, setLoading] = useState(true);
   const [questionsLoading, setQuestionsLoading] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
@@ -169,11 +176,23 @@ export default function PassagesPage() {
 
   const handleCreatePassage = async () => {
     try {
+      // Map UI sections -> questionSections payload
+      const questionSections = (newPassage.sections || []).map((s) => ({
+        title: s.name || '',
+        instructions: s.instructions || undefined,
+        questionType: s.questionType || (s.questions?.[0]?.type || 'true-false-not-given'),
+        questionRange: s.questionRange || `${Math.min(s.range.start, s.range.end)}-${Math.max(s.range.start, s.range.end)}`,
+        questions: [],
+      }));
+
       const passageData = {
-        ...newPassage,
+        title: newPassage.title,
+        content: newPassage.content,
+        type: newPassage.type,
         duration: newPassage.type === 'listening' ? newPassage.duration : undefined,
         audioUrl: newPassage.type === 'listening' ? newPassage.audioUrl : undefined,
-      };
+        questionSections,
+      } as any;
 
       await authService.apiRequest('/passages', {
         method: 'POST',
@@ -227,13 +246,13 @@ export default function PassagesPage() {
   };
 
   const addQuestionToSection = (sectionIndex: number) => {
-    const newQuestion: EmbeddedQuestion = {
+    const newQuestion: Question = {
+      _id: `temp-${Date.now()}`,
       number: 1,
       type: 'true-false-not-given',
       prompt: '',
       options: [],
-      points: 1,
-      correctAnswer: ''
+      points: 1
     };
 
     const updatedSections = [...newPassage.sections];
@@ -253,7 +272,7 @@ export default function PassagesPage() {
     });
   };
 
-  const updateQuestion = (sectionIndex: number, questionIndex: number, question: EmbeddedQuestion) => {
+  const updateQuestion = (sectionIndex: number, questionIndex: number, question: Question) => {
     const updatedSections = [...newPassage.sections];
     updatedSections[sectionIndex].questions[questionIndex] = question;
     setNewPassage({
@@ -270,10 +289,10 @@ export default function PassagesPage() {
   });
 
   const filteredQuestions = questions.filter(question => {
-    const matchesSearch = question.question.toLowerCase().includes(questionSearchTerm.toLowerCase()) ||
-      question.tags.some((tag: string) => tag.toLowerCase().includes(questionSearchTerm.toLowerCase()));
+    const matchesSearch = (question.question || question.prompt || '').toLowerCase().includes(questionSearchTerm.toLowerCase()) ||
+      (question.tags || []).some((tag: string) => tag.toLowerCase().includes(questionSearchTerm.toLowerCase()));
     const matchesType = selectedQuestionType === 'all' || question.type === selectedQuestionType;
-    const matchesDifficulty = selectedQuestionDifficulty === 'all' || question.difficulty === selectedQuestionDifficulty;
+    const matchesDifficulty = selectedQuestionDifficulty === 'all' || (question.difficulty || '').toString() === selectedQuestionDifficulty;
     const matchesPassageType = newPassage.type === 'reading' ?
       question.type === 'reading' :
       question.type === 'listening';
@@ -393,10 +412,10 @@ export default function PassagesPage() {
                   </div>
                 )}
 
-                {/* Sections */}
+                {/* Question Sections */}
                 <div className="space-y-4">
                   <div className="flex items-center justify-between">
-                    <Label>Sections</Label>
+                    <Label>Question Sections</Label>
                     <Button type="button" variant="outline" size="sm" onClick={addSection}>
                       <PlusIcon className="h-4 w-4 mr-1" />
                       Add Section
@@ -420,7 +439,7 @@ export default function PassagesPage() {
 
                         <div className="grid grid-cols-2 gap-4">
                           <div className="space-y-2">
-                            <Label>Section Name</Label>
+                            <Label>Section Title</Label>
                             <Input
                               placeholder="e.g., Câu 1–5: True/False/Not Given"
                               value={section.name}
@@ -514,7 +533,7 @@ export default function PassagesPage() {
                                       value={question.type}
                                       onValueChange={(value) => updateQuestion(sectionIndex, questionIndex, {
                                         ...question,
-                                        type: value as EmbeddedQuestion['type']
+                                        type: value
                                       })}
                                     >
                                       <SelectTrigger>
@@ -550,6 +569,48 @@ export default function PassagesPage() {
                                 {question.type === 'multiple-choice' && (
                                   <div className="space-y-2">
                                     <Label className="text-xs">Answer Options</Label>
+                                    <div className="space-y-2">
+                                      {['A', 'B', 'C', 'D'].map((letter, optionIndex) => (
+                                        <div key={letter} className="flex items-center gap-2">
+                                          <span className="text-xs font-medium w-6">
+                                            {letter}:
+                                          </span>
+                                          <Input
+                                            placeholder={`Option ${letter}`}
+                                            value={(question.options || ['', '', '', ''])[optionIndex] || ''}
+                                            onChange={(e) => {
+                                              const newOptions = [...(question.options || ['', '', '', ''])];
+                                              newOptions[optionIndex] = e.target.value;
+                                              updateQuestion(sectionIndex, questionIndex, {
+                                                ...question,
+                                                options: newOptions
+                                              });
+                                            }}
+                                          />
+                                        </div>
+                                      ))}
+                                    </div>
+                                    <div className="space-y-2">
+                                      {(question.options || ['', '', '', '']).map((option, optionIndex) => (
+                                        <div key={optionIndex} className="flex items-center gap-2">
+                                          <span className="text-xs font-medium w-6">
+                                            {String.fromCharCode(65 + optionIndex)}:
+                                          </span>
+                                          <Input
+                                            placeholder={`Option ${String.fromCharCode(65 + optionIndex)}`}
+                                            value={option}
+                                            onChange={(e) => {
+                                              const newOptions = [...(question.options || ['', '', '', ''])];
+                                              newOptions[optionIndex] = e.target.value;
+                                              updateQuestion(sectionIndex, questionIndex, {
+                                                ...question,
+                                                options: newOptions
+                                              });
+                                            }}
+                                          />
+                                        </div>
+                                      ))}
+                                    </div>
                                     <div className="space-y-2">
                                       {(question.options || ['', '', '', '']).map((option, optionIndex) => (
                                         <div key={optionIndex} className="flex items-center gap-2">
@@ -883,7 +944,7 @@ export default function PassagesPage() {
                     <TableCell>
                       <div className="flex items-center gap-1">
                         <FileText className="h-4 w-4 text-muted-foreground" />
-                        {passage.sections?.reduce((acc, section) => acc + section.questions.length, 0) || passage.questions?.length || 0}
+                        {passage.questionSections?.reduce((acc, s) => acc + (s.questions?.length || 0), 0) || passage.sections?.reduce((acc, section) => acc + section.questions.length, 0) || passage.questions?.length || 0}
                       </div>
                     </TableCell>
                     <TableCell>

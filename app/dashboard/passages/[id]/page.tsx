@@ -60,8 +60,16 @@ interface Passage {
   type: 'reading' | 'listening';
   audioUrl?: string;
   duration?: number;
-  questions?: Question[];
-  sections?: Section[];
+  questions?: Question[]; // legacy
+  sections?: Section[]; // legacy
+  questionSections?: {
+    _id?: string;
+    title: string;
+    instructions?: string;
+    questionType: string;
+    questionRange: string;
+    questions: string[];
+  }[];
   createdBy: {
     _id: string;
     firstName: string;
@@ -351,8 +359,35 @@ export default function PassageDetailPage() {
                     )}
 
                     <div className="space-y-2">
-                      <Label className="text-sm font-medium">Associated Questions ({passage.questions?.length || 0})</Label>
-                      {passage.sections && passage.sections?.length > 0 ? (
+                      <Label className="text-sm font-medium">Associated Questions ({(passage.questionSections?.reduce((acc, s) => acc + (s.questions?.length || 0), 0)) || passage.questions?.length || 0})</Label>
+                      {passage.questionSections && passage.questionSections?.length > 0 ? (
+                        <div className="space-y-3">
+                          {passage.questionSections?.map((section, sectionIndex) => (
+                            <div key={section._id || sectionIndex} className="border rounded-lg">
+                              <div className="p-4 bg-muted/30">
+                                <div className="flex items-center justify-between">
+                                  <div>
+                                    <h4 className="font-medium">{section.title}</h4>
+                                    {section.instructions && (
+                                      <p className="text-sm text-muted-foreground mt-1">{section.instructions}</p>
+                                    )}
+                                  </div>
+                                  <Badge variant="outline">
+                                    Questions {section.questionRange}
+                                  </Badge>
+                                </div>
+                              </div>
+                              <div className="p-4 text-sm text-muted-foreground">
+                                {section.questions && section.questions.length > 0 ? (
+                                  <div>{section.questions.length} question IDs</div>
+                                ) : (
+                                  <div>No questions linked in this section</div>
+                                )}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      ) : passage.sections && passage.sections?.length > 0 ? (
                         <div className="space-y-3">
                           {passage.sections?.map((section, sectionIndex) => (
                             <div key={section._id || sectionIndex} className="border rounded-lg">

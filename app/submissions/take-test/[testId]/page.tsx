@@ -64,8 +64,16 @@ interface Passage {
   content: string;
   type: 'reading' | 'listening';
   audioUrl?: string;
-  questions?: string[];
-  sections?: Section[];
+  questions?: string[]; // legacy
+  sections?: Section[]; // legacy
+  questionSections?: {
+    _id?: string;
+    title: string;
+    instructions?: string;
+    questionType: string;
+    questionRange: string;
+    questions: string[]; // array of Question IDs
+  }[];
 }
 
 interface Section {
@@ -184,8 +192,38 @@ export default function TakeTestPage() {
       // Process passages and their questions
       if (testData.passages && testData.passages.length > 0) {
         for (const passage of testData.passages) {
-          // Process sections if they exist
-          if (passage.sections && passage.sections?.length > 0) {
+          // New model: questionSections with question ID arrays
+          if (passage.questionSections && passage.questionSections?.length > 0) {
+            for (const section of passage.questionSections) {
+              if (section.questions && section.questions.length > 0) {
+                for (const questionId of section.questions) {
+                  try {
+                    const questionData = await authService.apiRequest(`/questions/${questionId}`);
+                    const questionWithContext: Question = {
+                      ...questionData,
+                      _id: questionData._id || `${passage._id}-${section._id}-${questionData.number}`,
+                      type: passage.type as 'reading' | 'listening' | 'writing',
+                      subType: questionData.subType || questionData.type,
+                      question: questionData.question || questionData.prompt || '',
+                      points: questionData.points || 1,
+                      passageId: passage._id,
+                      passageTitle: passage.title,
+                      passageContent: passage.content,
+                      passageAudioUrl: passage.audioUrl,
+                      sectionName: section.title,
+                      sectionInstructions: section.instructions,
+                      paragraphRef: questionData.paragraphRef
+                    };
+                    allQuestions.push(questionWithContext);
+                  } catch (error) {
+                    console.error(`Failed to fetch question ${questionId}:`, error);
+                  }
+                }
+              }
+            }
+          }
+          // Legacy: sections with embedded questions
+          else if (passage.sections && passage.sections?.length > 0) {
             for (const section of passage.sections) {
               if (section.questions && section.questions.length > 0) {
                 for (const question of section.questions) {
@@ -235,7 +273,7 @@ export default function TakeTestPage() {
 
       // Set current passage for first question
       if (allQuestions.length > 0 && allQuestions[0].passageId) {
-        const firstPassage = testData.passages?.find(p => p._id === allQuestions[0].passageId);
+        const firstPassage = testData.passages?.find((p: Passage) => p._id === allQuestions[0].passageId);
         setCurrentPassage(firstPassage || null);
       }
       // Start or continue submission

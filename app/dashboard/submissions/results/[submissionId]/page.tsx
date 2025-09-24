@@ -213,16 +213,33 @@ export default function TestResultsPage() {
     if (questionData) {
       const { question, passage, section } = questionData;
 
-      // Determine if answer is correct (simplified logic)
-      let isCorrect = false;
-      if (question.type === 'true-false-not-given') {
-        // For demo purposes, assume some logic here
-        isCorrect = Math.random() > 0.5; // Replace with actual correctness logic
-      } else if (question.type === 'matching-information') {
-        isCorrect = answer.answer === question.paragraphRef;
-      } else if (question.type === 'sentence-completion') {
-        // For demo purposes
-        isCorrect = answer.answer.toLowerCase().includes('sức khỏe') || answer.answer.toLowerCase().includes('tập trung');
+      // Determine if answer is correct using robust comparison
+      const normalizeAnswer = (value: unknown) => {
+        if (value === null || value === undefined) return '';
+        if (typeof value === 'number') return String(value);
+        if (typeof value !== 'string') return String(value ?? '');
+        return value.trim().toLowerCase();
+      };
+
+      const compareAnswers = (user: unknown, correct: unknown, type?: string) => {
+        if (user === undefined || user === null || correct === undefined || correct === null) return false;
+        const u = normalizeAnswer(user);
+        const c = normalizeAnswer(correct);
+        if (type === 'true-false-not-given') {
+          const map = (v: string) => {
+            if (v === 'true' || v === 't') return 'true';
+            if (v === 'false' || v === 'f') return 'false';
+            if (v === 'not given' || v === 'notgiven' || v === 'ng' || v === 'n/a') return 'not given';
+            return v;
+          };
+          return map(u) === map(c);
+        }
+        return u === c;
+      };
+
+      let isCorrect = compareAnswers(answer.answer, question.correctAnswer, question.type);
+      if (!isCorrect && question.type === 'matching-information') {
+        isCorrect = normalizeAnswer(answer.answer) === normalizeAnswer(question.paragraphRef);
       }
 
       questionsWithAnswers.push({
@@ -458,6 +475,15 @@ export default function TestResultsPage() {
                                             <p className="font-medium text-sm mb-1">Expected:</p>
                                             <div className="p-2 rounded text-sm bg-green-50 text-green-800 border border-green-200">
                                               Paragraph {question.paragraphRef}
+                                            </div>
+                                          </div>
+                                        )}
+
+                                        {question.correctAnswer && (
+                                          <div>
+                                            <p className="font-medium text-sm mb-1">Correct Answer:</p>
+                                            <div className="p-2 rounded text-sm bg-green-50 text-green-800 border border-green-200">
+                                              {question.correctAnswer}
                                             </div>
                                           </div>
                                         )}
