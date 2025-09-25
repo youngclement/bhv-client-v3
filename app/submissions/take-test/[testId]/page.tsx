@@ -64,8 +64,16 @@ interface Passage {
   content: string;
   type: 'reading' | 'listening';
   audioUrl?: string;
-  questions?: string[];
-  sections?: Section[];
+  questions?: string[]; // legacy
+  sections?: Section[]; // legacy
+  questionSections?: {
+    _id?: string;
+    title: string;
+    instructions?: string;
+    questionType: string;
+    questionRange: string;
+    questions: string[]; // IDs
+  }[];
 }
 
 interface Section {
@@ -184,8 +192,40 @@ export default function TakeTestPage() {
       // Process passages and their questions
       if (testData.passages && testData.passages.length > 0) {
         for (const passage of testData.passages) {
-          // Process sections if they exist
-          if (passage.sections && passage.sections?.length > 0) {
+          // New model: questionSections with question ID arrays
+          if (passage.questionSections && passage.questionSections?.length > 0) {
+            for (const section of passage.questionSections) {
+              if (section.questions && section.questions.length > 0) {
+                for (const questionId of section.questions) {
+                  try {
+                    const questionData = await authService.apiRequest(`/questions/${questionId}`);
+                    const questionWithContext: Question = {
+                      ...questionData,
+                      _id: questionData._id || `${passage._id}-${section._id}-${questionData.number}`,
+                      type: passage.type as 'reading' | 'listening' | 'writing',
+                      subType: questionData.subType || questionData.type,
+                      question: questionData.question || questionData.prompt || '',
+                      number: questionData.questionNumber || questionData.number,
+                      options: questionData.options || [],
+                      points: questionData.points || 1,
+                      passageId: passage._id,
+                      passageTitle: passage.title,
+                      passageContent: passage.content,
+                      passageAudioUrl: passage.audioUrl,
+                      sectionName: section.title,
+                      sectionInstructions: section.instructions,
+                      paragraphRef: questionData.paragraphRef
+                    };
+                    allQuestions.push(questionWithContext);
+                  } catch (error) {
+                    console.error(`Failed to fetch question ${questionId}:`, error);
+                  }
+                }
+              }
+            }
+          }
+          // Legacy: sections with embedded questions
+          else if (passage.sections && passage.sections?.length > 0) {
             for (const section of passage.sections) {
               if (section.questions && section.questions.length > 0) {
                 for (const question of section.questions) {
@@ -235,7 +275,7 @@ export default function TakeTestPage() {
 
       // Set current passage for first question
       if (allQuestions.length > 0 && allQuestions[0].passageId) {
-        const firstPassage = testData.passages?.find(p => p._id === allQuestions[0].passageId);
+        const firstPassage = testData.passages?.find((p: Passage) => p._id === allQuestions[0].passageId);
         setCurrentPassage(firstPassage || null);
       }
       // Start or continue submission
@@ -340,6 +380,16 @@ export default function TakeTestPage() {
   const handleAnswerChange = (questionId: string, answer: string) => {
     setAnswers(prev => ({ ...prev, [questionId]: answer }));
     saveAnswer(questionId, answer);
+  };
+
+  // For typing questions: update local only; commit onBlur
+  const handleAnswerChangeLocal = (questionId: string, answer: string) => {
+    setAnswers(prev => ({ ...prev, [questionId]: answer }));
+  };
+
+  const handleAnswerCommit = (questionId: string) => {
+    const value = answers[questionId] || '';
+    saveAnswer(questionId, value);
   };
 
   const handleNextQuestion = () => {
@@ -559,7 +609,7 @@ export default function TakeTestPage() {
                     <Badge variant="outline">
                       Q{currentQuestion?.number || (currentQuestionIndex + 1)}
                     </Badge>
-                    <Badge variant="secondary">{currentQuestion?.type.replace('-', ' ')}</Badge>
+                    <Badge variant="secondary">{(currentQuestion?.subType || currentQuestion?.type).replace('-', ' ')}</Badge>
                     <span>{currentQuestion?.points || 1} point{(currentQuestion?.points || 1) > 1 ? 's' : ''}</span>
                   </CardTitle>
                   {currentQuestion?.sectionName && (
@@ -597,24 +647,43 @@ export default function TakeTestPage() {
                         </div>
                       )}
 
-                      {/* True/False/Not Given */}
-                      {currentQuestion?.subType === 'true-false-not-given' && (
+                      {/* True/False/Not Given & Yes/No/Not Given */}
+                      {(currentQuestion?.subType === 'true-false-not-given' || currentQuestion?.subType === 'yes-no-not-given') && (
                         <RadioGroup
                           value={answers[currentQuestion?._id] || ''}
                           onValueChange={(value) => handleAnswerChange(currentQuestion?._id, value)}
                         >
-                          <div className="flex items-center space-x-2">
-                            <RadioGroupItem value="True" id="true" />
-                            <Label htmlFor="true" className="cursor-pointer">True</Label>
-                          </div>
-                          <div className="flex items-center space-x-2">
-                            <RadioGroupItem value="False" id="false" />
-                            <Label htmlFor="false" className="cursor-pointer">False</Label>
-                          </div>
-                          <div className="flex items-center space-x-2">
-                            <RadioGroupItem value="Not Given" id="not-given" />
-                            <Label htmlFor="not-given" className="cursor-pointer">Not Given</Label>
-                          </div>
+                          {currentQuestion?.subType === 'true-false-not-given' ? (
+                            <>
+                              <div className="flex items-center space-x-2">
+                                <RadioGroupItem value="True" id="true" />
+                                <Label htmlFor="true" className="cursor-pointer">True</Label>
+                              </div>
+                              <div className="flex items-center space-x-2">
+                                <RadioGroupItem value="False" id="false" />
+                                <Label htmlFor="false" className="cursor-pointer">False</Label>
+                              </div>
+                              <div className="flex items-center space-x-2">
+                                <RadioGroupItem value="Not Given" id="not-given" />
+                                <Label htmlFor="not-given" className="cursor-pointer">Not Given</Label>
+                              </div>
+                            </>
+                          ) : (
+                            <>
+                              <div className="flex items-center space-x-2">
+                                <RadioGroupItem value="yes" id="yes" />
+                                <Label htmlFor="yes" className="cursor-pointer">Yes</Label>
+                              </div>
+                              <div className="flex items-center space-x-2">
+                                <RadioGroupItem value="no" id="no" />
+                                <Label htmlFor="no" className="cursor-pointer">No</Label>
+                              </div>
+                              <div className="flex items-center space-x-2">
+                                <RadioGroupItem value="not given" id="notgiven" />
+                                <Label htmlFor="notgiven" className="cursor-pointer">Not Given</Label>
+                              </div>
+                            </>
+                          )}
                         </RadioGroup>
                       )}
 
@@ -656,30 +725,44 @@ export default function TakeTestPage() {
                       )}
 
                       {/* Matching Headings */}
-                      {currentQuestion?.subType === 'matching-headings' && currentQuestion?.options && (
-                        <RadioGroup
-                          value={answers[currentQuestion?._id] || ''}
-                          onValueChange={(value) => handleAnswerChange(currentQuestion?._id, value)}
-                        >
-                          {currentQuestion?.options?.map((option, index) => (
-                            <div key={index} className="flex items-center space-x-2">
-                              <RadioGroupItem value={option} id={`heading-${index}`} />
-                              <Label htmlFor={`heading-${index}`} className="cursor-pointer">
-                                {option}
-                              </Label>
-                            </div>
-                          ))}
-                        </RadioGroup>
+                      {currentQuestion?.subType === 'matching-headings' && (
+                        <>
+                          {currentQuestion?.options && currentQuestion.options.length > 0 ? (
+                            <RadioGroup
+                              value={answers[currentQuestion?._id] || ''}
+                              onValueChange={(value) => handleAnswerChange(currentQuestion?._id, value)}
+                            >
+                              {currentQuestion.options.map((option, index) => (
+                                <div key={index} className="flex items-center space-x-2">
+                                  <RadioGroupItem value={option} id={`heading-${index}`} />
+                                  <Label htmlFor={`heading-${index}`} className="cursor-pointer">
+                                    {option}
+                                  </Label>
+                                </div>
+                              ))}
+                            </RadioGroup>
+                          ) : (
+                            <Input
+                              placeholder="Enter heading label (e.g., I, II, III)"
+                              value={answers[currentQuestion?._id] || ''}
+                              onChange={(e) => handleAnswerChangeLocal(currentQuestion?._id, e.target.value)}
+                              onBlur={() => handleAnswerCommit(currentQuestion?._id)}
+                            />
+                          )}
+                        </>
                       )}
 
                       {/* Sentence Completion / Summary Completion / Short Answer */}
                       {(currentQuestion?.subType === 'sentence-completion' ||
                         currentQuestion?.subType === 'summary-completion' ||
-                        currentQuestion?.subType === 'short-answer') && (
+                        currentQuestion?.subType === 'short-answer' ||
+                        currentQuestion?.subType === 'fill-blank' ||
+                        currentQuestion?.subType === 'diagram-completion') && (
                           <Input
                             placeholder="Enter your answer..."
                             value={answers[currentQuestion?._id] || ''}
-                            onChange={(e) => handleAnswerChange(currentQuestion?._id, e.target.value)}
+                            onChange={(e) => handleAnswerChangeLocal(currentQuestion?._id, e.target.value)}
+                            onBlur={() => handleAnswerCommit(currentQuestion?._id)}
                           />
                         )}
 

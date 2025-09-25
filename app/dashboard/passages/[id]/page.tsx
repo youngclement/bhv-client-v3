@@ -60,8 +60,28 @@ interface Passage {
   type: 'reading' | 'listening';
   audioUrl?: string;
   duration?: number;
-  questions?: Question[];
-  sections?: Section[];
+  questions?: Question[]; // legacy
+  sections?: Section[]; // legacy
+  questionSections?: {
+    _id?: string;
+    title: string;
+    instructions?: string;
+    questionType: string;
+    questionRange: string;
+    questions: Array<{
+      _id: string;
+      type: string; // reading
+      subType: string; // e.g. yes-no-not-given
+      question: string;
+      options?: string[];
+      correctAnswer?: string;
+      points?: number;
+      paragraphRef?: string;
+      questionNumber?: number;
+      difficulty?: string;
+      tags?: string[];
+    }>;
+  }[];
   createdBy: {
     _id: string;
     firstName: string;
@@ -351,8 +371,87 @@ export default function PassageDetailPage() {
                     )}
 
                     <div className="space-y-2">
-                      <Label className="text-sm font-medium">Associated Questions ({passage.questions?.length || 0})</Label>
-                      {passage.sections && passage.sections?.length > 0 ? (
+                      <Label className="text-sm font-medium">Associated Questions ({
+                        passage.questionSections?.reduce((acc, s) => acc + (s.questions?.length || 0), 0)
+                        || passage.sections?.reduce((acc, section) => acc + section.questions.length, 0)
+                        || passage.questions?.length || 0
+                      })</Label>
+                      {passage.questionSections && passage.questionSections?.length > 0 ? (
+                        <div className="space-y-3">
+                          {passage.questionSections?.map((section, sectionIndex) => (
+                            <div key={section._id || sectionIndex} className="border rounded-lg">
+                              <div className="p-4 bg-muted/30">
+                                <div className="flex items-center justify-between">
+                                  <div>
+                                    <h4 className="font-medium">{section.title}</h4>
+                                    {section.instructions && (
+                                      <p className="text-sm text-muted-foreground mt-1">{section.instructions}</p>
+                                    )}
+                                  </div>
+                                  <div className="flex items-center gap-2">
+                                    <Badge variant="outline">Questions {section.questionRange}</Badge>
+                                    <Badge variant="secondary" className="capitalize">{section.questionType?.replace(/-/g, ' ')}</Badge>
+                                  </div>
+                                </div>
+                              </div>
+
+                              <div className="p-4 space-y-3">
+                                {section.questions?.map((q, idx) => (
+                                  <div key={q._id || idx} className="p-3 bg-accent/20 rounded border">
+                                    <div className="flex items-start justify-between">
+                                      <div className="flex-1">
+                                        <div className="flex items-center gap-2 mb-2 flex-wrap">
+                                          <Badge variant="outline" className="text-xs">
+                                            Q{q.questionNumber ?? ''}
+                                          </Badge>
+                                          <Badge variant="secondary" className="text-xs capitalize">
+                                            {q.subType?.replace(/-/g, ' ') || section.questionType}
+                                          </Badge>
+                                          {q.paragraphRef && (
+                                            <Badge variant="outline" className="text-xs">
+                                              Paragraph {q.paragraphRef}
+                                            </Badge>
+                                          )}
+                                          {typeof q.points === 'number' && (
+                                            <Badge variant="outline" className="text-xs">{q.points} pts</Badge>
+                                          )}
+                                          {q.difficulty && (
+                                            <Badge variant="outline" className={`text-xs ${getDifficultyColor(q.difficulty)}`}>{q.difficulty}</Badge>
+                                          )}
+                                        </div>
+                                        <p className="text-sm font-medium mb-1">{q.question}</p>
+                                        {q.options && q.options.length > 0 && (
+                                          <div className="text-xs text-muted-foreground">
+                                            Options: {q.options.join(', ')}
+                                          </div>
+                                        )}
+                                        {q.tags && q.tags.length > 0 && (
+                                          <div className="flex flex-wrap gap-1 mt-2">
+                                            {q.tags.map((t, i) => (
+                                              <Badge key={`${q._id}-tag-${i}`} variant="outline" className="text-[10px]">{t}</Badge>
+                                            ))}
+                                          </div>
+                                        )}
+                                        {q.correctAnswer && (
+                                          <div className="text-xs mt-1">
+                                            <span className="text-muted-foreground">Correct:</span> {q.correctAnswer}
+                                          </div>
+                                        )}
+                                      </div>
+                                    </div>
+                                  </div>
+                                ))}
+
+                                {(!section.questions || section.questions.length === 0) && (
+                                  <div className="text-center py-4 text-muted-foreground text-sm">
+                                    No questions in this section
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      ) : passage.sections && passage.sections?.length > 0 ? (
                         <div className="space-y-3">
                           {passage.sections?.map((section, sectionIndex) => (
                             <div key={section._id || sectionIndex} className="border rounded-lg">

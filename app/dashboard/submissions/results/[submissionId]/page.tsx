@@ -54,6 +54,7 @@ interface Passage {
   audioUrl?: string;
   questions: any[];
   sections: Section[];
+  questionSections?: any[];
   createdBy: string;
   createdAt: string;
   updatedAt: string;
@@ -108,6 +109,8 @@ export default function TestResultsPage() {
   const router = useRouter();
   const params = useParams();
   const [result, setResult] = useState<SubmissionResult | null>(null);
+  const [questionIndex, setQuestionIndex] = useState<Record<string, any>>({});
+  const questionIndexMap = questionIndex;
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -124,6 +127,19 @@ export default function TestResultsPage() {
       }
 
       const data = await authService.getSubmissionResults(submissionId);
+      // Prefetch questions by ID if questionSections present
+      const ids: string[] = [];
+      (data?.testId?.passages || []).forEach((p: any) => {
+        (p?.questionSections || []).forEach((s: any) => {
+          (s?.questions || []).forEach((q: any) => { if (typeof q === 'string') ids.push(q); });
+        });
+      });
+      const unique = Array.from(new Set(ids));
+      const idx: Record<string, any> = {};
+      await Promise.all(unique.map(async (id) => {
+        try { idx[id] = await authService.apiRequest(`/questions/${id}`); } catch { }
+      }));
+      setQuestionIndex(idx);
       setResult(data);
     } catch (error) {
       console.error('Failed to fetch results:', error);
@@ -196,15 +212,24 @@ export default function TestResultsPage() {
   // Process questions and answers
   const questionsWithAnswers: QuestionWithAnswer[] = [];
 
-  // Build question map from passages
-  const questionMap = new Map<string, { question: Question; passage: Passage; section: Section }>();
-
-  result.testId.passages.forEach(passage => {
-    passage.sections?.forEach(section => {
-      section.questions.forEach(question => {
-        questionMap.set(question._id, { question, passage, section });
+  // Build question map from passages (supports questionSections with IDs)
+  const questionMap = new Map<string, { question: any; passage: any; section: any }>();
+  result.testId.passages.forEach((passage: any) => {
+    if (passage?.questionSections?.length) {
+      passage.questionSections.forEach((section: any) => {
+        (section.questions || []).forEach((q: any) => {
+          const question = typeof q === 'string' ? questionIndex[q] : q;
+          if (question?._id) questionMap.set(question._id, { question, passage, section });
+        });
       });
-    });
+    }
+    if (passage?.sections?.length) {
+      passage.sections.forEach((section: any) => {
+        (section.questions || []).forEach((question: any) => {
+          if (question?._id) questionMap.set(question._id, { question, passage, section });
+        });
+      });
+    }
   });
 
   // Match answers with questions
@@ -394,18 +419,27 @@ export default function TestResultsPage() {
                             </div>
                           </div>
 
-                          {/* Sections */}
-                          {passage.sections?.map((section, sectionIndex) => (
+                          {/* Sections - prefer questionSections if present */}
+                          {(passage.questionSections || passage.sections || []).map((section: any, sectionIndex: number) => (
                             <div key={section._id} className="ml-4 space-y-3">
                               <div className="bg-accent/20 p-3 rounded-lg">
-                                <h4 className="font-medium">{section.name}</h4>
+                                <h4 className="font-medium">{section.title || section.name}</h4>
+                                <div className="text-xs text-muted-foreground">
+                                  {section.questionRange ? (
+                                    <span>Questions {section.questionRange}</span>
+                                  ) : (
+                                    section.range && <span>Questions {section.range.start}-{section.range.end}</span>
+                                  )}
+                                </div>
                                 {section.instructions && (
                                   <p className="text-sm text-muted-foreground mt-1">{section.instructions}</p>
                                 )}
                               </div>
 
                               {/* Questions in this section */}
-                              {section.questions.map((question, questionIndex) => {
+                              {(section.questions || []).map((q: any, questionIndex: number) => {
+                                const question: any = typeof q === 'string' ? questionIndexMap[q] : q;
+                                if (!question) return null;
                                 const answer = result.answers.find(a => a.questionId === question._id);
                                 const questionWithAnswer = questionsWithAnswers.find(qa => qa.question._id === question._id);
                                 const isCorrect = questionWithAnswer?.isCorrect || false;
@@ -414,9 +448,9 @@ export default function TestResultsPage() {
                                   <div key={question._id} className="ml-4 border rounded-lg p-4">
                                     <div className="flex items-start justify-between mb-3">
                                       <div className="flex items-center gap-2">
-                                        <span className="font-medium">Question {question.number}</span>
+                                        <span className="font-medium">Question {question.number || question.questionNumber}</span>
                                         <Badge variant="outline" className="text-xs">
-                                          {question.type.replace('-', ' ')}
+                                          {(question.subType || question.type).replace('-', ' ')}
                                         </Badge>
                                         {question.paragraphRef && (
                                           <Badge variant="outline" className="text-xs">
@@ -439,7 +473,7 @@ export default function TestResultsPage() {
                                     <div className="space-y-3">
                                       <div>
                                         <p className="font-medium text-sm mb-2">Question:</p>
-                                        <p className="text-sm">{question.prompt}</p>
+                                        <p className="text-sm">{question.prompt || question.question}</p>
                                       </div>
 
                                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -453,11 +487,19 @@ export default function TestResultsPage() {
                                           </div>
                                         </div>
 
-                                        {question.type === 'matching-information' && (
+                                        {question.subType === 'matching-information' && (
                                           <div>
                                             <p className="font-medium text-sm mb-1">Expected:</p>
                                             <div className="p-2 rounded text-sm bg-green-50 text-green-800 border border-green-200">
                                               Paragraph {question.paragraphRef}
+                                            </div>
+                                          </div>
+                                        )}
+                                        {question.correctAnswer && (
+                                          <div>
+                                            <p className="font-medium text-sm mb-1">Correct Answer:</p>
+                                            <div className="p-2 rounded text-sm bg-green-50 text-green-800 border border-green-200">
+                                              {question.correctAnswer}
                                             </div>
                                           </div>
                                         )}

@@ -169,11 +169,35 @@ export default function PassagesPage() {
 
   const handleCreatePassage = async () => {
     try {
+      // Sanitize questions: only include options for types that need them and drop empties
+      const sanitizeQuestion = (q: EmbeddedQuestion) => {
+        const question: any = { ...q };
+        if (q.type === 'multiple-choice' || q.type === 'matching-headings') {
+          const trimmed = (q.options || []).map(o => (o || '').trim()).filter(o => o.length > 0);
+          if (trimmed.length > 0) {
+            question.options = q.type === 'multiple-choice' ? trimmed.slice(0, 4) : trimmed;
+          } else {
+            delete question.options;
+          }
+        } else {
+          delete question.options;
+        }
+        return question;
+      };
+
+      const sanitizedSections = (newPassage.sections || []).map((s) => ({
+        ...s,
+        questions: (s.questions || []).map(sanitizeQuestion)
+      }));
+
       const passageData = {
-        ...newPassage,
+        title: newPassage.title,
+        content: newPassage.content,
+        type: newPassage.type,
         duration: newPassage.type === 'listening' ? newPassage.duration : undefined,
         audioUrl: newPassage.type === 'listening' ? newPassage.audioUrl : undefined,
-      };
+        sections: sanitizedSections,
+      } as any;
 
       await authService.apiRequest('/passages', {
         method: 'POST',
@@ -229,9 +253,9 @@ export default function PassagesPage() {
   const addQuestionToSection = (sectionIndex: number) => {
     const newQuestion: EmbeddedQuestion = {
       number: 1,
-      type: 'true-false-not-given',
+      type: 'multiple-choice',
       prompt: '',
-      options: [],
+      options: ['', '', '', ''],
       points: 1,
       correctAnswer: ''
     };
@@ -782,7 +806,18 @@ export default function PassagesPage() {
               </Button>
               <Button
                 onClick={handleCreatePassage}
-                disabled={!newPassage.title || !newPassage.content}
+                disabled={
+                  !newPassage.title ||
+                  !newPassage.content ||
+                  newPassage.sections.some((s) =>
+                    s.questions.some((q) =>
+                      q.type === 'multiple-choice' && (
+                        !(q.options || []).slice(0, 4).every((o) => (o || '').trim().length > 0) ||
+                        !(q.correctAnswer && q.correctAnswer.trim().length > 0)
+                      )
+                    )
+                  )
+                }
               >
                 Create Passage
               </Button>
