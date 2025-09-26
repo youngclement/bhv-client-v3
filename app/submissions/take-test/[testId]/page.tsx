@@ -498,6 +498,29 @@ export default function TakeTestPage() {
   }
 
   const currentQuestion = allQuestions[currentQuestionIndex];
+  const getAnswerKey = (q?: Question, index?: number) => {
+    if (!q) return '';
+    const uniquePart = typeof q.number === 'number' ? q.number : ((index ?? currentQuestionIndex) + 1);
+    return `${q._id}:${uniquePart}`;
+  };
+  const currentAnswerKey = getAnswerKey(currentQuestion, currentQuestionIndex);
+  // UI answer helpers: keep UI keyed uniquely, but save by real questionId
+  const handleSelectAnswer = (question: Question, index: number, value: string) => {
+    const key = getAnswerKey(question, index);
+    setAnswers(prev => ({ ...prev, [key]: value }));
+    saveAnswer(question._id, value);
+  };
+
+  const handleLocalInputChange = (question: Question, index: number, value: string) => {
+    const key = getAnswerKey(question, index);
+    setAnswers(prev => ({ ...prev, [key]: value }));
+  };
+
+  const handleLocalInputCommit = (question: Question, index: number) => {
+    const key = getAnswerKey(question, index);
+    const value = answers[key] || '';
+    saveAnswer(question._id, value);
+  };
   const progress = allQuestions.length > 0 ? ((currentQuestionIndex + 1) / allQuestions.length) * 100 : 0;
   const answeredCount = Object.keys(answers).length;
 
@@ -650,37 +673,37 @@ export default function TakeTestPage() {
                       {/* True/False/Not Given & Yes/No/Not Given */}
                       {(currentQuestion?.subType === 'true-false-not-given' || currentQuestion?.subType === 'yes-no-not-given') && (
                         <RadioGroup
-                          value={answers[currentQuestion?._id] || ''}
-                          onValueChange={(value) => handleAnswerChange(currentQuestion?._id, value)}
+                          value={answers[currentAnswerKey] || ''}
+                          onValueChange={(value) => handleSelectAnswer(currentQuestion, currentQuestionIndex, value)}
                         >
                           {currentQuestion?.subType === 'true-false-not-given' ? (
                             <>
                               <div className="flex items-center space-x-2">
-                                <RadioGroupItem value="True" id="true" />
-                                <Label htmlFor="true" className="cursor-pointer">True</Label>
+                                <RadioGroupItem value="True" id={`tf-${currentQuestionIndex}-true`} />
+                                <Label htmlFor={`tf-${currentQuestionIndex}-true`} className="cursor-pointer">True</Label>
                               </div>
                               <div className="flex items-center space-x-2">
-                                <RadioGroupItem value="False" id="false" />
-                                <Label htmlFor="false" className="cursor-pointer">False</Label>
+                                <RadioGroupItem value="False" id={`tf-${currentQuestionIndex}-false`} />
+                                <Label htmlFor={`tf-${currentQuestionIndex}-false`} className="cursor-pointer">False</Label>
                               </div>
                               <div className="flex items-center space-x-2">
-                                <RadioGroupItem value="Not Given" id="not-given" />
-                                <Label htmlFor="not-given" className="cursor-pointer">Not Given</Label>
+                                <RadioGroupItem value="Not Given" id={`tf-${currentQuestionIndex}-not-given`} />
+                                <Label htmlFor={`tf-${currentQuestionIndex}-not-given`} className="cursor-pointer">Not Given</Label>
                               </div>
                             </>
                           ) : (
                             <>
                               <div className="flex items-center space-x-2">
-                                <RadioGroupItem value="yes" id="yes" />
-                                <Label htmlFor="yes" className="cursor-pointer">Yes</Label>
+                                <RadioGroupItem value="yes" id={`yn-${currentQuestionIndex}-yes`} />
+                                <Label htmlFor={`yn-${currentQuestionIndex}-yes`} className="cursor-pointer">Yes</Label>
                               </div>
                               <div className="flex items-center space-x-2">
-                                <RadioGroupItem value="no" id="no" />
-                                <Label htmlFor="no" className="cursor-pointer">No</Label>
+                                <RadioGroupItem value="no" id={`yn-${currentQuestionIndex}-no`} />
+                                <Label htmlFor={`yn-${currentQuestionIndex}-no`} className="cursor-pointer">No</Label>
                               </div>
                               <div className="flex items-center space-x-2">
-                                <RadioGroupItem value="not given" id="notgiven" />
-                                <Label htmlFor="notgiven" className="cursor-pointer">Not Given</Label>
+                                <RadioGroupItem value="not given" id={`yn-${currentQuestionIndex}-notgiven`} />
+                                <Label htmlFor={`yn-${currentQuestionIndex}-notgiven`} className="cursor-pointer">Not Given</Label>
                               </div>
                             </>
                           )}
@@ -690,13 +713,13 @@ export default function TakeTestPage() {
                       {/* Multiple Choice */}
                       {currentQuestion?.subType === 'multiple-choice' && currentQuestion?.options && (
                         <RadioGroup
-                          value={answers[currentQuestion?._id] || ''}
-                          onValueChange={(value) => handleAnswerChange(currentQuestion?._id, value)}
+                          value={answers[currentAnswerKey] || ''}
+                          onValueChange={(value) => handleSelectAnswer(currentQuestion, currentQuestionIndex, value)}
                         >
                           {currentQuestion?.options?.map((option, index) => (
                             <div key={index} className="flex items-center space-x-2">
-                              <RadioGroupItem value={option} id={`option-${index}`} />
-                              <Label htmlFor={`option-${index}`} className="cursor-pointer">
+                              <RadioGroupItem value={option} id={`option-${currentQuestionIndex}-${index}`} />
+                              <Label htmlFor={`option-${currentQuestionIndex}-${index}`} className="cursor-pointer">
                                 {option}
                               </Label>
                             </div>
@@ -709,13 +732,13 @@ export default function TakeTestPage() {
                         <div className="space-y-2">
                           <Label className="text-sm">Select the correct paragraph:</Label>
                           <RadioGroup
-                            value={answers[currentQuestion?._id] || ''}
-                            onValueChange={(value) => handleAnswerChange(currentQuestion?._id, value)}
+                            value={answers[currentAnswerKey] || ''}
+                            onValueChange={(value) => handleSelectAnswer(currentQuestion, currentQuestionIndex, value)}
                           >
                             {['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H'].map((letter) => (
                               <div key={letter} className="flex items-center space-x-2">
-                                <RadioGroupItem value={letter} id={`para-${letter}`} />
-                                <Label htmlFor={`para-${letter}`} className="cursor-pointer">
+                                <RadioGroupItem value={letter} id={`para-${currentQuestionIndex}-${letter}`} />
+                                <Label htmlFor={`para-${currentQuestionIndex}-${letter}`} className="cursor-pointer">
                                   Paragraph {letter}
                                 </Label>
                               </div>
@@ -729,13 +752,13 @@ export default function TakeTestPage() {
                         <>
                           {currentQuestion?.options && currentQuestion.options.length > 0 ? (
                             <RadioGroup
-                              value={answers[currentQuestion?._id] || ''}
-                              onValueChange={(value) => handleAnswerChange(currentQuestion?._id, value)}
+                              value={answers[currentAnswerKey] || ''}
+                              onValueChange={(value) => handleSelectAnswer(currentQuestion, currentQuestionIndex, value)}
                             >
                               {currentQuestion.options.map((option, index) => (
                                 <div key={index} className="flex items-center space-x-2">
-                                  <RadioGroupItem value={option} id={`heading-${index}`} />
-                                  <Label htmlFor={`heading-${index}`} className="cursor-pointer">
+                                  <RadioGroupItem value={option} id={`heading-${currentQuestionIndex}-${index}`} />
+                                  <Label htmlFor={`heading-${currentQuestionIndex}-${index}`} className="cursor-pointer">
                                     {option}
                                   </Label>
                                 </div>
@@ -744,9 +767,9 @@ export default function TakeTestPage() {
                           ) : (
                             <Input
                               placeholder="Enter heading label (e.g., I, II, III)"
-                              value={answers[currentQuestion?._id] || ''}
-                              onChange={(e) => handleAnswerChangeLocal(currentQuestion?._id, e.target.value)}
-                              onBlur={() => handleAnswerCommit(currentQuestion?._id)}
+                              value={answers[currentAnswerKey] || ''}
+                              onChange={(e) => handleLocalInputChange(currentQuestion, currentQuestionIndex, e.target.value)}
+                              onBlur={() => handleLocalInputCommit(currentQuestion, currentQuestionIndex)}
                             />
                           )}
                         </>
@@ -760,9 +783,9 @@ export default function TakeTestPage() {
                         currentQuestion?.subType === 'diagram-completion') && (
                           <Input
                             placeholder="Enter your answer..."
-                            value={answers[currentQuestion?._id] || ''}
-                            onChange={(e) => handleAnswerChangeLocal(currentQuestion?._id, e.target.value)}
-                            onBlur={() => handleAnswerCommit(currentQuestion?._id)}
+                            value={answers[currentAnswerKey] || ''}
+                            onChange={(e) => handleLocalInputChange(currentQuestion, currentQuestionIndex, e.target.value)}
+                            onBlur={() => handleLocalInputCommit(currentQuestion, currentQuestionIndex)}
                           />
                         )}
 
@@ -771,8 +794,8 @@ export default function TakeTestPage() {
                         <Textarea
                           placeholder="Write your response here..."
                           rows={10}
-                          value={answers[currentQuestion?._id] || ''}
-                          onChange={(e) => handleAnswerChange(currentQuestion?._id, e.target.value)}
+                          value={answers[currentAnswerKey] || ''}
+                          onChange={(e) => handleSelectAnswer(currentQuestion, currentQuestionIndex, e.target.value)}
                         />
                       )}
                     </div>
@@ -850,7 +873,7 @@ export default function TakeTestPage() {
                         key={index}
                         variant={currentQuestionIndex === index ? "default" : "outline"}
                         size="sm"
-                        className={`h-8 w-8 p-0 ${answers[question._id]
+                        className={`h-8 w-8 p-0 ${answers[getAnswerKey(question, index)]
                           ? 'bg-green-100 border-green-300 text-green-800 hover:bg-green-200'
                           : ''
                           }`}

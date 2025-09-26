@@ -375,8 +375,8 @@ export default function TakeTestPage() {
                       >
                         {currentQuestion?.options.map((option, index) => (
                           <div key={index} className="flex items-center space-x-2">
-                            <RadioGroupItem value={option} id={`option-${index}`} />
-                            <Label htmlFor={`option-${index}`} className="cursor-pointer">
+                            <RadioGroupItem value={option} id={`option-${currentQuestionIndex}-${index}`} />
+                            <Label htmlFor={`option-${currentQuestionIndex}-${index}`} className="cursor-pointer">
                               {option}
                             </Label>
                           </div>
@@ -392,8 +392,8 @@ export default function TakeTestPage() {
                       >
                         {currentQuestion?.options.map((option, index) => (
                           <div key={index} className="flex items-center space-x-2">
-                            <RadioGroupItem value={option} id={`tf-${index}`} />
-                            <Label htmlFor={`tf-${index}`} className="cursor-pointer">
+                            <RadioGroupItem value={option} id={`tf-${currentQuestionIndex}-${index}`} />
+                            <Label htmlFor={`tf-${currentQuestionIndex}-${index}`} className="cursor-pointer">
                               {option}
                             </Label>
                           </div>
@@ -495,8 +495,8 @@ export default function TakeTestPage() {
                       variant={currentQuestionIndex === index ? "default" : "outline"}
                       size="sm"
                       className={`h-8 w-8 p-0 ${answers[test.questions[index]._id]
-                          ? 'bg-green-100 border-green-300 text-green-800 hover:bg-green-200'
-                          : ''
+                        ? 'bg-green-100 border-green-300 text-green-800 hover:bg-green-200'
+                        : ''
                         }`}
                       onClick={() => {
                         setCurrentQuestionIndex(index);
