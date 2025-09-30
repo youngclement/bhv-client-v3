@@ -23,8 +23,12 @@ export default function LoginPage() {
     setError('');
 
     try {
-      await authService.login(email, password);
-      router.push('/dashboard');
+      const { user } = await authService.login(email, password);
+      if (user.role === 'student') {
+        router.push('/submissions');
+      } else {
+        router.push('/dashboard');
+      }
     } catch (err) {
       setError('Invalid credentials. Please try again.');
     } finally {

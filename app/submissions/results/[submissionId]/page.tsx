@@ -65,6 +65,13 @@ export default function TestResultsPage() {
   const params = useParams();
   const [result, setResult] = useState<SubmissionResult | null>(null);
   const [loading, setLoading] = useState(true);
+  useEffect(() => {
+    // Auto-redirect back to tests list after viewing results
+    const timer = setTimeout(() => {
+      router.push('/submissions');
+    }, 8000);
+    return () => clearTimeout(timer);
+  }, [router]);
 
   useEffect(() => {
     if (params.submissionId) {

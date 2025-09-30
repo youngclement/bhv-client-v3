@@ -112,6 +112,13 @@ export default function TestResultsPage() {
   const [questionIndex, setQuestionIndex] = useState<Record<string, any>>({});
   const questionIndexMap = questionIndex;
   const [loading, setLoading] = useState(true);
+  useEffect(() => {
+    // Auto-redirect back to tests list after viewing results
+    const timer = setTimeout(() => {
+      router.push('/dashboard/submissions');
+    }, 8000);
+    return () => clearTimeout(timer);
+  }, [router]);
 
   useEffect(() => {
     if (params.submissionId) {
@@ -212,7 +219,7 @@ export default function TestResultsPage() {
   // Process questions and answers
   const questionsWithAnswers: QuestionWithAnswer[] = [];
 
-  // Build question map from passages (supports questionSections with IDs)
+  // Build question map from passages (supports questionSections with IDs and legacy sections without IDs)
   const questionMap = new Map<string, { question: any; passage: any; section: any }>();
   result.testId.passages.forEach((passage: any) => {
     if (passage?.questionSections?.length) {
@@ -226,38 +233,33 @@ export default function TestResultsPage() {
     if (passage?.sections?.length) {
       passage.sections.forEach((section: any) => {
         (section.questions || []).forEach((question: any) => {
+          // Map by existing _id if present
           if (question?._id) questionMap.set(question._id, { question, passage, section });
+          // Also map by composite id format used in submissions when _id is absent: `${passageId}-${sectionId}-${number}`
+          if (!question?._id && passage?._id && section?._id && (question?.number != null)) {
+            const compositeId = `${passage._id}-${section._id}-${question.number}`;
+            questionMap.set(compositeId, { question, passage, section });
+          }
         });
       });
     }
   });
 
+  // Helpers for correctness
+  const normalize = (v: any) => (v ?? '').toString().trim().toLowerCase();
+  const computeCorrectness = (q: any, a: any) => {
+    const correct = q?.correctAnswer ?? q?.answer ?? (q?.type === 'matching-information' ? q?.paragraphRef : undefined);
+    if (correct == null) return false;
+    return normalize(a?.answer) === normalize(correct);
+  };
+
   // Match answers with questions
   result.answers.forEach(answer => {
     const questionData = questionMap.get(answer.questionId);
-    if (questionData) {
-      const { question, passage, section } = questionData;
-
-      // Determine if answer is correct (simplified logic)
-      let isCorrect = false;
-      if (question.type === 'true-false-not-given') {
-        // For demo purposes, assume some logic here
-        isCorrect = Math.random() > 0.5; // Replace with actual correctness logic
-      } else if (question.type === 'matching-information') {
-        isCorrect = answer.answer === question.paragraphRef;
-      } else if (question.type === 'sentence-completion') {
-        // For demo purposes
-        isCorrect = answer.answer.toLowerCase().includes('sức khỏe') || answer.answer.toLowerCase().includes('tập trung');
-      }
-
-      questionsWithAnswers.push({
-        question,
-        answer,
-        passage,
-        section,
-        isCorrect
-      });
-    }
+    if (!questionData) return;
+    const { question, passage, section } = questionData;
+    const isCorrect = computeCorrectness(question, answer);
+    questionsWithAnswers.push({ question, answer, passage, section, isCorrect });
   });
 
   // Calculate statistics
@@ -440,9 +442,10 @@ export default function TestResultsPage() {
                               {(section.questions || []).map((q: any, questionIndex: number) => {
                                 const question: any = typeof q === 'string' ? questionIndexMap[q] : q;
                                 if (!question) return null;
-                                const answer = result.answers.find(a => a.questionId === question._id);
-                                const questionWithAnswer = questionsWithAnswers.find(qa => qa.question._id === question._id);
+                                const answer = result.answers.find(a => a.questionId === question._id || a.questionId === `${passage._id}-${section._id}-${question.number}`);
+                                const questionWithAnswer = questionsWithAnswers.find(qa => qa.question._id === question._id || `${passage._id}-${section._id}-${question.number}` === (qa.answer?.questionId));
                                 const isCorrect = questionWithAnswer?.isCorrect || false;
+                                const correctDisplay = question.correctAnswer || question.answer || (question.subType === 'matching-information' || question.type === 'matching-information' ? `Paragraph ${question.paragraphRef}` : undefined);
 
                                 return (
                                   <div key={question._id} className="ml-4 border rounded-lg p-4">
@@ -487,19 +490,11 @@ export default function TestResultsPage() {
                                           </div>
                                         </div>
 
-                                        {question.subType === 'matching-information' && (
-                                          <div>
-                                            <p className="font-medium text-sm mb-1">Expected:</p>
-                                            <div className="p-2 rounded text-sm bg-green-50 text-green-800 border border-green-200">
-                                              Paragraph {question.paragraphRef}
-                                            </div>
-                                          </div>
-                                        )}
-                                        {question.correctAnswer && (
+                                        {correctDisplay && (
                                           <div>
                                             <p className="font-medium text-sm mb-1">Correct Answer:</p>
                                             <div className="p-2 rounded text-sm bg-green-50 text-green-800 border border-green-200">
-                                              {question.correctAnswer}
+                                              {correctDisplay}
                                             </div>
                                           </div>
                                         )}

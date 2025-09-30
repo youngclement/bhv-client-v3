@@ -152,6 +152,16 @@ export default function StudentsPage() {
     return hours > 0 ? `${hours}h ${mins}m` : `${mins}m`;
   };
 
+  const formatDateTime = (iso?: string) => {
+    if (!iso) return { date: '', time: '' };
+    const d = new Date(iso);
+    if (isNaN(d.getTime())) return { date: '', time: '' };
+    return {
+      date: format(d, 'dd/MM/yyyy'),
+      time: format(d, 'HH:mm')
+    };
+  };
+
   // Calculate summary stats
   const totalStudents = students.length;
   const averageScore = totalStudents > 0 ? students.reduce((acc, student) => acc + (student.stats?.averageScore || 0), 0) / totalStudents : 0;
@@ -459,15 +469,20 @@ export default function StudentsPage() {
                     <TableCell>
                       <div className="text-sm">
                         {student.lastActivity ? (
-                          <>
-                            <div className="flex items-center gap-1">
-                              <Activity className="h-3 w-3 text-muted-foreground" />
-                              <span>{format(new Date(student.lastActivity), 'MMM dd')}</span>
-                            </div>
-                            <div className="text-xs text-muted-foreground">
-                              {format(new Date(student.lastActivity), 'HH:mm')}
-                            </div>
-                          </>
+                          (() => {
+                            const dt = formatDateTime(student.lastActivity);
+                            return (
+                              <>
+                                <div className="flex items-center gap-1">
+                                  <Activity className="h-3 w-3 text-muted-foreground" />
+                                  <span>{dt.date}</span>
+                                </div>
+                                <div className="text-xs text-muted-foreground">
+                                  {dt.time}
+                                </div>
+                              </>
+                            );
+                          })()
                         ) : (
                           <span className="text-muted-foreground">No activity</span>
                         )}

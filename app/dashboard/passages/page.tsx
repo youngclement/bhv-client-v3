@@ -251,8 +251,14 @@ export default function PassagesPage() {
   };
 
   const addQuestionToSection = (sectionIndex: number) => {
+    const updatedSections = [...newPassage.sections];
+    const section = updatedSections[sectionIndex];
+    const existingNumbers = (section.questions || []).map(q => q.number || 0);
+    const lastNumber = existingNumbers.length > 0 ? Math.max(...existingNumbers) : (section.range?.start || 1) - 1;
+    const nextNumber = lastNumber + 1;
+
     const newQuestion: EmbeddedQuestion = {
-      number: 1,
+      number: nextNumber,
       type: 'multiple-choice',
       prompt: '',
       options: ['', '', '', ''],
@@ -260,8 +266,7 @@ export default function PassagesPage() {
       correctAnswer: ''
     };
 
-    const updatedSections = [...newPassage.sections];
-    updatedSections[sectionIndex].questions.push(newQuestion);
+    section.questions.push(newQuestion);
     setNewPassage({
       ...newPassage,
       sections: updatedSections
@@ -270,7 +275,11 @@ export default function PassagesPage() {
 
   const removeQuestionFromSection = (sectionIndex: number, questionIndex: number) => {
     const updatedSections = [...newPassage.sections];
-    updatedSections[sectionIndex].questions.splice(questionIndex, 1);
+    const section = updatedSections[sectionIndex];
+    section.questions.splice(questionIndex, 1);
+    const startNumber = section.range?.start || 1;
+    section.questions = section.questions.map((q, idx) => ({ ...q, number: startNumber + idx }));
+    updatedSections[sectionIndex] = section;
     setNewPassage({
       ...newPassage,
       sections: updatedSections

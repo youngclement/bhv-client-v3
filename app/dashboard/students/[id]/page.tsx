@@ -152,10 +152,30 @@ export default function StudentDetailPage() {
     }
   };
 
-  const formatTimeSpent = (minutes: number) => {
-    const hours = Math.floor(minutes / 60);
-    const mins = minutes % 60;
+  const formatTimeSpent = (minutes?: number) => {
+    const totalMinutes = typeof minutes === 'number' && !isNaN(minutes) ? minutes : 0;
+    const hours = Math.floor(totalMinutes / 60);
+    const mins = Math.floor(totalMinutes % 60);
     return hours > 0 ? `${hours}h ${mins}m` : `${mins}m`;
+  };
+
+  // Accept seconds (from submissions API) and render h m s
+  const formatDurationHMS = (seconds?: number) => {
+    const totalSeconds = typeof seconds === 'number' && !isNaN(seconds) ? seconds : 0;
+    const hours = Math.floor(totalSeconds / 3600);
+    const minutes = Math.floor((totalSeconds % 3600) / 60);
+    const secs = totalSeconds % 60;
+    if (hours > 0) return `${hours}h ${minutes}m ${secs}s`;
+    if (minutes > 0) return `${minutes}m ${secs}s`;
+    return `${secs}s`;
+  };
+
+  const formatDateTime = (iso?: string) => {
+    if (!iso) return '';
+    const d = new Date(iso);
+    const date = d.toLocaleDateString();
+    const time = d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    return `${date} ${time}`;
   };
 
   if (loading) {
@@ -391,7 +411,7 @@ export default function StudentDetailPage() {
                           <div className="flex-1">
                             <p className="text-sm font-medium">{submission.testId?.title}</p>
                             <p className="text-xs text-muted-foreground">
-                              {submission.testId?.type} • {new Date(submission.submittedAt).toLocaleDateString()}
+                              {submission.testId?.type} • {formatDateTime(submission.submittedAt)}
                             </p>
                           </div>
                           <div className="text-right">
@@ -399,7 +419,7 @@ export default function StudentDetailPage() {
                               {submission.score}%
                             </div>
                             <div className="text-xs text-muted-foreground">
-                              {formatTimeSpent(submission.timeSpent)}
+                              {formatDurationHMS(submission.timeSpent)}
                             </div>
                           </div>
                         </div>
@@ -466,7 +486,7 @@ export default function StudentDetailPage() {
                               {submission.testId?.type} • Submitted {new Date(submission.submittedAt).toLocaleDateString()}
                             </p>
                             <p className="text-xs text-muted-foreground">
-                              Time spent: {formatTimeSpent(submission.timeSpent)}
+                              Time spent: {formatDurationHMS(submission.timeSpent)}
                             </p>
                           </div>
                           <div className="text-right">

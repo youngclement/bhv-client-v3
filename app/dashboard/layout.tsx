@@ -13,21 +13,34 @@ export default function DashboardLayout({
   children: React.ReactNode;
 }) {
   const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null);
+  const [isAuthorized, setIsAuthorized] = useState<boolean | null>(null);
   const router = useRouter();
 
   useEffect(() => {
-    const checkAuth = () => {
-      if (authService.isAuthenticated()) {
-        setIsAuthenticated(true);
-      } else {
+    const checkAuthAndRole = async () => {
+      if (!authService.isAuthenticated()) {
+        router.push('/login');
+        return;
+      }
+      setIsAuthenticated(true);
+
+      try {
+        const profile = await authService.getProfile();
+        if (profile.role === 'student') {
+          setIsAuthorized(false);
+          router.push('/submissions');
+        } else {
+          setIsAuthorized(true);
+        }
+      } catch (_err) {
         router.push('/login');
       }
     };
 
-    checkAuth();
+    checkAuthAndRole();
   }, [router]);
 
-  if (isAuthenticated === null) {
+  if (isAuthenticated === null || isAuthorized === null) {
     return (
       <div className="flex h-screen items-center justify-center">
         <div className="text-center">
