@@ -22,6 +22,10 @@ class AuthService {
     return localStorage.getItem(this.tokenKey);
   }
 
+  getBaseUrl(): string {
+    return this.baseUrl;
+  }
+
   setToken(token: string): void {
     localStorage.setItem(this.tokenKey, token);
   }
@@ -105,7 +109,15 @@ class AuthService {
     const response = await this.authenticatedRequest(endpoint, options);
     
     if (!response.ok) {
-      throw new Error(`API request failed: ${response.status}`);
+      let errorMessage = `API request failed: ${response.status}`;
+      try {
+        const errorData = await response.json();
+        console.error('API Error Details:', errorData);
+        errorMessage += ` - ${errorData.message || errorData.error || 'Unknown error'}`;
+      } catch (e) {
+        console.error('Failed to parse error response');
+      }
+      throw new Error(errorMessage);
     }
 
     return response.json();

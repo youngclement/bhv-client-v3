@@ -32,6 +32,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { ScrollArea } from '@/components/ui/scroll-area';
+  import { AudioUpload } from '@/components/ui/audio-upload';
 import { Plus, Search, Edit2, Trash2, BookOpen, Volume2, PenTool } from 'lucide-react';
 import { authService } from '@/lib/auth';
 import { useRouter } from 'next/navigation';
@@ -42,6 +43,7 @@ interface Question {
   subType: string;
   question: string;
   passage?: string;
+  audioUrl?: string;
   options?: string[];
   correctAnswer?: string;
   points: number;
@@ -78,12 +80,14 @@ export default function QuestionsPage() {
     subType: '',
     question: '',
     passage: '',
+    audioUrl: '',
     options: ['', '', '', ''],
     correctAnswer: '',
     points: 1,
     difficulty: 'medium' as 'easy' | 'medium' | 'hard',
     tags: '',
   });
+  const [audioFile, setAudioFile] = useState<File | null>(null);
 
   useEffect(() => {
     fetchQuestions();
@@ -102,16 +106,61 @@ export default function QuestionsPage() {
 
   const handleCreateQuestion = async () => {
     try {
-      const questionData = {
-        ...newQuestion,
-        tags: newQuestion.tags.split(',').map(tag => tag.trim()).filter(Boolean),
-        options: newQuestion.type === 'reading' ? newQuestion.options : undefined,
-      };
+      // Use FormData for file upload
+      const formData = new FormData();
+      
+      // Add basic question data
+      formData.append('type', newQuestion.type);
+      formData.append('subType', newQuestion.subType);
+      formData.append('question', newQuestion.question);
+      formData.append('points', newQuestion.points.toString());
+      formData.append('difficulty', newQuestion.difficulty);
+      
+      if (newQuestion.tags) {
+        const tags = newQuestion.tags.split(',').map(tag => tag.trim()).filter(Boolean);
+        formData.append('tags', JSON.stringify(tags));
+      }
 
-      await authService.apiRequest('/questions', {
+      // Add type-specific fields
+      if (newQuestion.type === 'reading' && newQuestion.passage) {
+        formData.append('passage', newQuestion.passage);
+      }
+
+      if (newQuestion.type === 'listening') {
+        if (audioFile) {
+          formData.append('audioFile', audioFile);
+        } else if (newQuestion.audioUrl) {
+          formData.append('audioUrl', newQuestion.audioUrl);
+        }
+      }
+
+      if ((newQuestion.type === 'reading' || newQuestion.type === 'listening') && 
+          newQuestion.subType === 'multiple-choice' && 
+          newQuestion.options.some(opt => opt.trim())) {
+        const options = newQuestion.options.filter(opt => opt.trim());
+        formData.append('options', JSON.stringify(options));
+        if (newQuestion.correctAnswer) {
+          formData.append('correctAnswer', newQuestion.correctAnswer);
+        }
+      }
+
+      console.log('Sending question data with FormData');
+      
+      // Use fetch directly for FormData
+      const token = authService.getToken();
+      const response = await fetch('http://localhost:8000/api/questions', {
         method: 'POST',
-        body: JSON.stringify(questionData),
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          // Don't set Content-Type for FormData
+        },
+        body: formData,
       });
+
+      if (!response.ok) {
+        const errorData = await response.text();
+        throw new Error(`API request failed: ${response.status} - ${errorData}`);
+      }
 
       setIsCreateDialogOpen(false);
       fetchQuestions();
@@ -122,12 +171,14 @@ export default function QuestionsPage() {
         subType: '',
         question: '',
         passage: '',
+        audioUrl: '',
         options: ['', '', '', ''],
         correctAnswer: '',
         points: 1,
         difficulty: 'medium',
         tags: '',
       });
+      setAudioFile(null);
     } catch (error) {
       console.error('Failed to create question:', error);
     }
@@ -230,6 +281,15 @@ export default function QuestionsPage() {
                 </div>
               )}
 
+              {newQuestion.type === 'listening' && (
+                <AudioUpload
+                  value={newQuestion.audioUrl}
+                  file={audioFile}
+                  onChange={(url) => setNewQuestion({...newQuestion, audioUrl: url})}
+                  onFileChange={setAudioFile}
+                />
+              )}
+
               <div className="space-y-2">
                 <Label htmlFor="question">Question</Label>
                 <Textarea
@@ -240,7 +300,7 @@ export default function QuestionsPage() {
                 />
               </div>
 
-              {newQuestion.type === 'reading' && newQuestion.subType === 'multiple-choice' && (
+              {(newQuestion.type === 'reading' || newQuestion.type === 'listening') && newQuestion.subType === 'multiple-choice' && (
                 <div className="space-y-2">
                   <Label>Options</Label>
                   {newQuestion.options.map((option, index) => (
@@ -385,6 +445,12 @@ export default function QuestionsPage() {
                       <div className="text-sm text-muted-foreground capitalize">
                         {question.subType?.replace('-', ' ') || 'N/A'}
                       </div>
+                      {question.type === 'listening' && question.audioUrl && (
+                        <div className="flex items-center gap-1 text-xs text-blue-600 mt-1">
+                          <Volume2 className="h-3 w-3" />
+                          Audio attached
+                        </div>
+                      )}
                       {question.createdBy && (
                         <div className="text-xs text-muted-foreground mt-1">
                           by {question.createdBy.firstName} {question.createdBy.lastName}
