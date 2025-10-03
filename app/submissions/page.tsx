@@ -26,7 +26,15 @@ import {
   PenTool,
   Calendar,
   ArrowLeft,
-  LogOut
+  LogOut,
+  ArrowRight,
+  FileText,
+  Grid3x3,
+  Target,
+  TrendingUp,
+  Flame,
+  Trophy,
+  Lightbulb
 } from 'lucide-react';
 import { authService } from '@/lib/auth';
 import { useRouter } from 'next/navigation';
@@ -269,87 +277,187 @@ export default function SubmissionsPage() {
 
       {/* Main Content */}
       <div className="max-w-[100rem] mx-auto px-2 sm:px-3 lg:px-6 xl:px-8 py-4">
+        {/* Quick Actions */}
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-6">
+          <Button 
+            className="bg-[#004875] hover:bg-[#003a5c] text-white h-12 justify-start gap-3"
+            onClick={() => {
+              const nextTest = assignments.find(a => a.submissionStatus === 'not-started');
+              if (nextTest) handleStartTest(nextTest._id, nextTest.testId._id);
+            }}
+          >
+            <ArrowRight className="h-5 w-5" />
+            <span className="font-semibold">Take Next Test</span>
+          </Button>
+          <Button 
+            variant="outline" 
+            className="h-12 justify-start gap-3 border-slate-300 hover:bg-slate-50"
+            onClick={() => {/* Navigate to results */}}
+          >
+            <FileText className="h-5 w-5" />
+            <span className="font-semibold">Review Results</span>
+          </Button>
+          <Button 
+            variant="outline" 
+            className="h-12 justify-start gap-3 border-slate-300 hover:bg-slate-50"
+            onClick={() => {/* Navigate to practice */}}
+          >
+            <Grid3x3 className="h-5 w-5" />
+            <span className="font-semibold">Practice Mode</span>
+          </Button>
+        </div>
+
         <div className="flex flex-col lg:flex-row gap-4 lg:gap-6">
           {/* Left Sidebar */}
-          <div className="lg:w-80 flex-shrink-0">
-            <div className="sticky top-20 space-y-4">
-              {/* Search */}
-              <Card className="border-slate-200 shadow-sm">
-                <CardContent className="pt-4 pb-4">
-                  <div className="relative">
-                    <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
-                    <Input
-                      placeholder="Search tests..."
-                      className="pl-10 border-slate-200 focus:border-[#004875] focus:ring-[#004875]"
-                      value={searchTerm}
-                      onChange={(e) => setSearchTerm(e.target.value)}
-                    />
+          <div className="lg:w-80 flex-shrink-0 space-y-4">
+            {/* Header Section */}
+            <Card className="border-slate-200 shadow-sm">
+              <CardContent className="pt-6 pb-6">
+                <h2 className="text-xl font-bold text-slate-900">My Assignments</h2>
+                <p className="text-sm text-slate-600 mt-1">View and take your assignETS tests</p>
+              </CardContent>
+            </Card>
+
+            {/* Total Assignments */}
+            <Card className="border-slate-200 shadow-sm">
+              <CardContent className="pt-6 pb-6">
+                <p className="text-sm font-medium text-slate-500 mb-4 text-center">Total Assignments</p>
+                <div className="grid grid-cols-2 gap-4 mb-4">
+                  <div className="text-center">
+                    <div className="text-3xl font-bold text-slate-900">{assignments.length}</div>
+                    <div className="text-xs text-slate-500 mt-1">Total</div>
                   </div>
-                </CardContent>
-              </Card>
+                  <div className="text-center">
+                    <div className="text-3xl font-bold text-slate-900">{assignments.filter(a => a.submissionStatus === 'completed').length}</div>
+                    <div className="text-xs text-slate-500 mt-1">Completed</div>
+                  </div>
+                </div>
+                <div className="pt-4 border-t border-slate-200 flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Play className="h-4 w-4 text-[#004875]" />
+                    <span className="text-sm font-medium text-slate-700">In Progress</span>
+                  </div>
+                  <span className="text-lg font-bold text-slate-900">{assignments.filter(a => a.submissionStatus === 'in-progress').length}</span>
+                </div>
+              </CardContent>
+            </Card>
 
-              {/* Header Section */}
-              <Card className="border-slate-200 shadow-sm">
-                <CardContent className="pt-6 pb-6">
-                  <h2 className="text-xl font-bold text-slate-900">My Assignments</h2>
-                  <p className="text-sm text-slate-600 mt-1">View and take your assigned IELTS tests</p>
-                </CardContent>
-              </Card>
-
-              {/* Stats Overview */}
-              <Card className="border-slate-200 shadow-sm">
-                <CardContent className="pt-4 pb-4">
-                  <div className="space-y-3">
-                    {/* Total */}
-                    <div className="flex items-center justify-between py-3 border-b border-slate-100">
-                      <div className="flex items-center gap-3">
-                        <div className="h-10 w-10 rounded-lg bg-slate-50 border border-slate-200 flex items-center justify-center">
-                          <BookOpen className="h-5 w-5 text-slate-600" />
-                        </div>
-                        <div>
-                          <p className="text-xs font-medium text-slate-500">Total Assignments</p>
-                          <p className="text-lg font-bold text-slate-900">{assignments.length}</p>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Completed */}
-                    <div className="flex items-center justify-between py-3 border-b border-slate-100">
-                      <div className="flex items-center gap-3">
-                        <div className="h-10 w-10 rounded-lg bg-slate-50 border border-slate-200 flex items-center justify-center">
-                          <CheckCircle className="h-5 w-5 text-slate-600" />
-                        </div>
-                        <div>
-                          <p className="text-xs font-medium text-slate-500">Completed</p>
-                          <p className="text-lg font-bold text-slate-900">
-                            {assignments.filter(a => a.submissionStatus === 'completed').length}
-                          </p>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* In Progress */}
-                    <div className="flex items-center justify-between py-3">
-                      <div className="flex items-center gap-3">
-                        <div className="h-10 w-10 rounded-lg bg-slate-50 border border-slate-200 flex items-center justify-center">
-                          <Play className="h-5 w-5 text-slate-600" />
-                        </div>
-                        <div>
-                          <p className="text-xs font-medium text-slate-500">In Progress</p>
-                          <p className="text-lg font-bold text-slate-900">
-                            {assignments.filter(a => a.submissionStatus === 'in-progress').length}
-                          </p>
-                        </div>
-                      </div>
+            {/* Progress Overview with Circle */}
+            <Card className="border-slate-200 shadow-sm">
+              <CardHeader className="pb-3">
+                <CardTitle className="text-base">Progress Overview</CardTitle>
+              </CardHeader>
+              <CardContent>
+                {/* Progress Circle */}
+                <div className="flex items-center justify-center mb-6">
+                  <div className="relative w-32 h-32">
+                    <svg className="w-full h-full transform -rotate-90">
+                      <circle
+                        cx="64"
+                        cy="64"
+                        r="56"
+                        stroke="currentColor"
+                        strokeWidth="8"
+                        fill="none"
+                        className="text-slate-200"
+                      />
+                      <circle
+                        cx="64"
+                        cy="64"
+                        r="56"
+                        stroke="currentColor"
+                        strokeWidth="8"
+                        fill="none"
+                        strokeDasharray={`${(assignments.filter(a => a.submissionStatus === 'completed').length / Math.max(assignments.length, 1)) * 352} 352`}
+                        className="text-[#004875]"
+                        strokeLinecap="round"
+                      />
+                    </svg>
+                    <div className="absolute inset-0 flex flex-col items-center justify-center">
+                      <span className="text-2xl font-bold text-slate-900">
+                        {Math.round((assignments.filter(a => a.submissionStatus === 'completed').length / Math.max(assignments.length, 1)) * 100)}%
+                      </span>
+                      <span className="text-xs text-slate-500">Test de done</span>
                     </div>
                   </div>
-                </CardContent>
-              </Card>
-            </div>
+                </div>
+
+                {/* Progress Bars */}
+                <div className="space-y-4">
+                  <div>
+                    <div className="flex justify-between text-sm mb-2">
+                      <span className="font-medium">Listening</span>
+                      <span className="text-slate-600">
+                        {assignments.filter(a => a.testId?.type === 'listening' && a.submissionStatus === 'completed').length}/{assignments.filter(a => a.testId?.type === 'listening').length} tests done
+                      </span>
+                    </div>
+                    <div className="h-2 bg-slate-200 rounded-full overflow-hidden">
+                      <div 
+                        className="h-full bg-[#004875] rounded-full transition-all"
+                        style={{
+                          width: `${(assignments.filter(a => a.testId?.type === 'listening' && a.submissionStatus === 'completed').length / Math.max(assignments.filter(a => a.testId?.type === 'listening').length, 1)) * 100}%`
+                        }}
+                      />
+                    </div>
+                  </div>
+                  <div>
+                    <div className="flex justify-between text-sm mb-2">
+                      <span className="font-medium">Reading</span>
+                      <span className="text-slate-600">
+                        {assignments.filter(a => a.testId?.type === 'reading' && a.submissionStatus === 'completed').length}/{assignments.filter(a => a.testId?.type === 'reading').length} tests done
+                      </span>
+                    </div>
+                    <div className="h-2 bg-slate-200 rounded-full overflow-hidden">
+                      <div 
+                        className="h-full bg-[#004875] rounded-full transition-all"
+                        style={{
+                          width: `${(assignments.filter(a => a.testId?.type === 'reading' && a.submissionStatus === 'completed').length / Math.max(assignments.filter(a => a.testId?.type === 'reading').length, 1)) * 100}%`
+                        }}
+                      />
+                    </div>
+                  </div>
+                  <div className="pt-2 border-t border-slate-200">
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm font-medium">Attempts</span>
+                      <span className="text-sm font-bold text-slate-900">0</span>
+                    </div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Motivational Tip */}
+            <Card className="border-blue-200 bg-blue-50/50 shadow-sm">
+              <CardContent className="pt-4 pb-4">
+                <div className="flex gap-3">
+                  <Lightbulb className="h-5 w-5 text-blue-600 flex-shrink-0 mt-0.5" />
+                  <div>
+                    <h3 className="font-semibold text-sm text-blue-900 mb-1">Tip</h3>
+                    <p className="text-xs text-blue-800 leading-relaxed">
+                      In the Listening section, look out for section changes. This can help you identify answers!
+                    </p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
           </div>
 
           {/* Right Content - Tests Table */}
-          <div className="flex-1 min-w-0">
+          <div className="flex-1 min-w-0 space-y-4">
+            {/* Search */}
+            <Card className="border-slate-200 shadow-sm">
+              <CardContent className="pt-4 pb-4">
+                <div className="relative">
+                  <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
+                  <Input
+                    placeholder="Search tests..."
+                    className="pl-10 border-slate-200 focus:border-[#004875] focus:ring-[#004875]"
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                  />
+                </div>
+              </CardContent>
+            </Card>
           {/* Tests Table */}
           <Card className="border-slate-200 shadow-sm">
             <CardHeader className="border-b border-slate-100 bg-slate-50/50 px-4 sm:px-6 py-4 sm:py-6">
