@@ -1,0 +1,43 @@
+<svg width="200" height="200" viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
+  <!-- Gold Circle Background -->
+  <circle cx="100" cy="100" r="95" fill="#D4AF37" stroke="#004875" stroke-width="3"/>
+  
+  <!-- Inner Circle -->
+  <circle cx="100" cy="100" r="75" fill="#004875"/>
+  
+  <!-- Torch Flame -->
+  <path d="M100 40 Q110 50 108 65 Q106 75 100 80 Q94 75 92 65 Q90 50 100 40 Z" fill="#FFD700"/>
+  <path d="M100 45 Q107 53 105 65 Q103 72 100 75 Q97 72 95 65 Q93 53 100 45 Z" fill="#FFA500"/>
+  
+  <!-- Torch Handle -->
+  <rect x="95" y="75" width="10" height="50" fill="#D4AF37" stroke="#8B6914" stroke-width="2"/>
+  <rect x="90" y="85" width="20" height="6" fill="#8B6914"/>
+  <rect x="90" y="95" width="20" height="6" fill="#8B6914"/>
+  <rect x="90" y="105" width="20" height="6" fill="#8B6914"/>
+  
+  <!-- Base -->
+  <rect x="88" y="125" width="24" height="10" fill="#8B6914"/>
+  
+  <!-- Laurel Branches -->
+  <g fill="#006400" opacity="0.8">
+    <!-- Left Branch -->
+    <ellipse cx="55" cy="70" rx="4" ry="8" transform="rotate(-30 55 70)"/>
+    <ellipse cx="50" cy="80" rx="4" ry="8" transform="rotate(-25 50 80)"/>
+    <ellipse cx="47" cy="90" rx="4" ry="8" transform="rotate(-20 47 90)"/>
+    <ellipse cx="46" cy="100" rx="4" ry="8" transform="rotate(-15 46 100)"/>
+    <ellipse cx="47" cy="110" rx="4" ry="8" transform="rotate(-10 47 110)"/>
+    <ellipse cx="50" cy="120" rx="4" ry="8" transform="rotate(-5 50 120)"/>
+    
+    <!-- Right Branch -->
+    <ellipse cx="145" cy="70" rx="4" ry="8" transform="rotate(30 145 70)"/>
+    <ellipse cx="150" cy="80" rx="4" ry="8" transform="rotate(25 150 80)"/>
+    <ellipse cx="153" cy="90" rx="4" ry="8" transform="rotate(20 153 90)"/>
+    <ellipse cx="154" cy="100" rx="4" ry="8" transform="rotate(15 154 100)"/>
+    <ellipse cx="153" cy="110" rx="4" ry="8" transform="rotate(10 153 110)"/>
+    <ellipse cx="150" cy="120" rx="4" ry="8" transform="rotate(5 150 120)"/>
+  </g>
+  
+  <!-- Text -->
+  <text x="100" y="155" font-family="Arial, sans-serif" font-size="12" font-weight="bold" text-anchor="middle" fill="#D4AF37">BHV ENGLISH</text>
+  <text x="100" y="175" font-family="Arial, sans-serif" font-size="8" text-anchor="middle" fill="#D4AF37">BRINGING HOME THE VALUES</text>
+</svg>
