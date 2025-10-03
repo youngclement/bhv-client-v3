@@ -102,9 +102,23 @@ export default function CreatePassagePage() {
   const handleCreatePassage = async () => {
     try {
       setLoading(true);
+      
+      // Prepare payload - only include audioUrl for listening passages
+      const payload: any = {
+        title: passage.title,
+        content: passage.content,
+        type: passage.type,
+        sections: passage.sections
+      };
+      
+      // Only add audioUrl if type is listening and audioUrl is provided
+      if (passage.type === 'listening' && passage.audioUrl) {
+        payload.audioUrl = passage.audioUrl;
+      }
+      
       await authService.apiRequest('/passages', {
         method: 'POST',
-        body: JSON.stringify(passage)
+        body: JSON.stringify(payload)
       });
       router.push('/dashboard/passages');
     } catch (error: any) {
@@ -191,19 +205,197 @@ export default function CreatePassagePage() {
     });
   };
 
+  // ============================================
+  // SAMPLE DATA FILLER - Xóa function này khi không cần nữa
+  // ============================================
+  const fillSampleData = () => {
+    const samplePassage = {
+      title: 'The Impact of Social Media on Modern Communication',
+      content: `Social media has fundamentally transformed the way people communicate in the 21st century. Platforms like Facebook, Twitter, and Instagram have created new forms of interaction that blend personal and public communication in unprecedented ways.
+
+The rise of social media has brought both benefits and challenges. On one hand, it has made it easier for people to stay connected with friends and family across vast distances. On the other hand, concerns have emerged about privacy, misinformation, and the psychological effects of constant connectivity.
+
+Research suggests that while social media can enhance social connections, excessive use may lead to feelings of isolation and anxiety. The constant comparison with others' curated online personas can negatively impact self-esteem, particularly among young people.
+
+Despite these concerns, social media continues to evolve and shape modern society. New platforms emerge regularly, each offering different features and appealing to different demographics. The challenge for users is to harness the benefits of social media while being mindful of its potential drawbacks.`,
+      type: 'reading' as 'reading' | 'listening',
+      audioUrl: '',
+      sections: [
+        {
+          name: 'Questions 1-5: True/False/Not Given',
+          instructions: 'Do the following statements agree with the information given in the passage?',
+          range: { start: 1, end: 5 },
+          questions: [
+            {
+              number: 1,
+              type: 'true-false-not-given' as const,
+              prompt: 'Social media has changed how people communicate in modern times.',
+              points: 1,
+              correctAnswer: 'True'
+            },
+            {
+              number: 2,
+              type: 'true-false-not-given' as const,
+              prompt: 'All research shows that social media has only negative effects.',
+              points: 1,
+              correctAnswer: 'False'
+            },
+            {
+              number: 3,
+              type: 'true-false-not-given' as const,
+              prompt: 'Young people are particularly affected by comparing themselves to others online.',
+              points: 1,
+              correctAnswer: 'True'
+            },
+            {
+              number: 4,
+              type: 'true-false-not-given' as const,
+              prompt: 'Facebook is the most popular social media platform worldwide.',
+              points: 1,
+              correctAnswer: 'Not Given'
+            },
+            {
+              number: 5,
+              type: 'true-false-not-given' as const,
+              prompt: 'Social media platforms are all designed for the same demographic.',
+              points: 1,
+              correctAnswer: 'False'
+            }
+          ]
+        },
+        {
+          name: 'Questions 6-10: Multiple Choice',
+          instructions: 'Choose the correct letter, A, B, C or D.',
+          range: { start: 6, end: 10 },
+          questions: [
+            {
+              number: 6,
+              type: 'multiple-choice' as const,
+              prompt: 'According to the passage, social media has:',
+              options: [
+                'Only positive effects on communication',
+                'Transformed modern communication methods',
+                'Replaced all traditional forms of communication',
+                'No significant impact on society'
+              ],
+              points: 1,
+              correctAnswer: 'B'
+            },
+            {
+              number: 7,
+              type: 'multiple-choice' as const,
+              prompt: 'What is mentioned as a benefit of social media?',
+              options: [
+                'It guarantees happiness',
+                'It eliminates all privacy concerns',
+                'It helps people stay connected across distances',
+                'It prevents misinformation'
+              ],
+              points: 1,
+              correctAnswer: 'C'
+            },
+            {
+              number: 8,
+              type: 'multiple-choice' as const,
+              prompt: 'The passage suggests that excessive social media use may lead to:',
+              options: [
+                'Better communication skills',
+                'Increased productivity',
+                'Feelings of isolation and anxiety',
+                'More real-world friendships'
+              ],
+              points: 1,
+              correctAnswer: 'C'
+            },
+            {
+              number: 9,
+              type: 'multiple-choice' as const,
+              prompt: 'What challenge do users face according to the passage?',
+              options: [
+                'Finding new platforms',
+                'Balancing benefits and drawbacks of social media',
+                'Learning how to use technology',
+                'Avoiding all social media platforms'
+              ],
+              points: 1,
+              correctAnswer: 'B'
+            },
+            {
+              number: 10,
+              type: 'multiple-choice' as const,
+              prompt: 'The passage mentions that new social media platforms:',
+              options: [
+                'Are all identical',
+                'Only appeal to young people',
+                'Emerge regularly with different features',
+                'Have stopped appearing'
+              ],
+              points: 1,
+              correctAnswer: 'C'
+            }
+          ]
+        },
+        {
+          name: 'Questions 11-13: Sentence Completion',
+          instructions: 'Complete the sentences below with NO MORE THAN TWO WORDS from the passage.',
+          range: { start: 11, end: 13 },
+          questions: [
+            {
+              number: 11,
+              type: 'sentence-completion' as const,
+              prompt: 'Social media platforms blend personal and ______ communication.',
+              points: 1,
+              correctAnswer: 'public'
+            },
+            {
+              number: 12,
+              type: 'sentence-completion' as const,
+              prompt: 'Concerns about privacy, misinformation, and ______ have emerged.',
+              points: 1,
+              correctAnswer: 'psychological effects'
+            },
+            {
+              number: 13,
+              type: 'sentence-completion' as const,
+              prompt: "Comparing with others' ______ can impact self-esteem negatively.",
+              points: 1,
+              correctAnswer: 'online personas'
+            }
+          ]
+        }
+      ]
+    };
+
+    setPassage(samplePassage);
+  };
+  // ============================================
+  // END OF SAMPLE DATA FILLER
+  // ============================================
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
         {/* Header */}
         <div className="mb-6">
-          <Button
-            variant="ghost"
-            onClick={() => router.push('/dashboard/passages')}
-            className="mb-4"
-          >
-            <ArrowLeft className="h-4 w-4 mr-2" />
-            Back to Passages
-          </Button>
+          <div className="flex items-center justify-between mb-4">
+            <Button
+              variant="ghost"
+              onClick={() => router.push('/dashboard/passages')}
+            >
+              <ArrowLeft className="h-4 w-4 mr-2" />
+              Back to Passages
+            </Button>
+            
+            {/* SAMPLE DATA BUTTON - Xóa button này khi không cần nữa */}
+            <Button
+              variant="outline"
+              onClick={fillSampleData}
+              className="bg-yellow-50 border-yellow-300 text-yellow-700 hover:bg-yellow-100"
+            >
+              <FileText className="h-4 w-4 mr-2" />
+              Fill Sample Data
+            </Button>
+          </div>
           <h1 className="text-3xl font-bold text-slate-900">Create New Passage</h1>
           <p className="text-slate-600 mt-1">Create a new passage and add questions from your question bank</p>
         </div>
