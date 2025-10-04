@@ -57,7 +57,7 @@ interface Test {
   _id: string;
   title: string;
   description: string;
-  type: 'reading' | 'listening' | 'writing' | 'mixed';
+  type: 'reading' | 'listening' | 'writing' | 'full';
   duration: number;
   isActive: boolean;
   questions: string[];
@@ -113,7 +113,7 @@ const testTypes = [
   { value: 'reading', label: 'Reading', icon: BookOpen },
   { value: 'listening', label: 'Listening', icon: Volume2 },
   { value: 'writing', label: 'Writing', icon: PenTool },
-  { value: 'mixed', label: 'Mixed', icon: Play },
+  { value: 'full', label: 'Full', icon: Play },
 ];
 
 export default function TestsPage() {
@@ -136,7 +136,7 @@ export default function TestsPage() {
   const [newTest, setNewTest] = useState({
     title: '',
     description: '',
-    type: 'reading' as 'reading' | 'listening' | 'writing' | 'mixed',
+    type: 'reading' as 'reading' | 'listening' | 'writing' | 'full',
     duration: 60,
     isActive: true,
     questions: [] as string[],
@@ -289,7 +289,7 @@ export default function TestsPage() {
       question.tags.some(tag => tag.toLowerCase().includes(questionSearchTerm.toLowerCase()));
     const matchesType = selectedQuestionType === 'all' || question.type === selectedQuestionType;
     const matchesDifficulty = selectedQuestionDifficulty === 'all' || question.difficulty === selectedQuestionDifficulty;
-    const matchesTestType = newTest.type === 'mixed' || question.type === newTest.type;
+    const matchesTestType = newTest.type === 'full' || question.type === newTest.type;
     return matchesSearch && matchesType && matchesDifficulty && matchesTestType;
   });
 
@@ -297,7 +297,7 @@ export default function TestsPage() {
     const matchesSearch = passage.title.toLowerCase().includes(passageSearchTerm.toLowerCase()) ||
       passage.content?.toLowerCase().includes(passageSearchTerm.toLowerCase());
     const matchesType = selectedPassageType === 'all' || passage.type === selectedPassageType;
-    const matchesTestType = newTest.type === 'mixed' || passage.type === newTest.type;
+    const matchesTestType = newTest.type === 'full' || passage.type === newTest.type;
     return matchesSearch && matchesType && matchesTestType;
   });
 
