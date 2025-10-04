@@ -2,6 +2,7 @@
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import {
   BarChart,
   Bar,
@@ -25,6 +26,8 @@ import {
   Award,
   Clock,
   CheckCircle,
+  Zap,
+  Sparkles,
 } from 'lucide-react';
 
 const stats = [
@@ -59,6 +62,22 @@ const stats = [
     trend: 'up',
     icon: CheckCircle,
     color: 'text-emerald-600',
+  },
+  {
+    title: 'Batch Created',
+    value: '24',
+    change: 'New!',
+    trend: 'up',
+    icon: Zap,
+    color: 'text-blue-500',
+  },
+  {
+    title: 'Templates Used',
+    value: '8',
+    change: 'New!',
+    trend: 'up',
+    icon: Sparkles,
+    color: 'text-purple-500',
   },
 ];
 
@@ -120,7 +139,7 @@ export default function DashboardPage() {
       </div>
 
       {/* Stats Grid */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
         {stats.map((stat) => (
           <Card key={stat.title} className="hover:shadow-md transition-shadow">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -138,6 +157,43 @@ export default function DashboardPage() {
           </Card>
         ))}
       </div>
+
+      {/* New Features Notification */}
+      <Card className="border-primary/20 bg-gradient-to-r from-primary/5 to-purple/5">
+        <CardHeader>
+          <div className="flex items-center gap-2">
+            <Sparkles className="h-5 w-5 text-primary" />
+            <CardTitle className="text-primary">🚀 New Features Available!</CardTitle>
+          </div>
+          <CardDescription>
+            Enhanced question creation tools are now available to boost your productivity
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-2">
+            <div className="flex items-start gap-3 p-3 rounded-lg bg-white/50">
+              <Zap className="h-5 w-5 text-blue-500 mt-1" />
+              <div>
+                <h4 className="font-medium text-blue-700">Batch Creation</h4>
+                <p className="text-sm text-muted-foreground">Create up to 50 questions at once with shared audio files</p>
+                <Button variant="link" className="p-0 h-auto text-blue-600 text-sm" asChild>
+                  <a href="/dashboard/questions/batch">Try Batch Creation →</a>
+                </Button>
+              </div>
+            </div>
+            <div className="flex items-start gap-3 p-3 rounded-lg bg-white/50">
+              <Sparkles className="h-5 w-5 text-purple-500 mt-1" />
+              <div>
+                <h4 className="font-medium text-purple-700">IELTS Templates</h4>
+                <p className="text-sm text-muted-foreground">Use standardized templates for faster question creation</p>
+                <Button variant="link" className="p-0 h-auto text-purple-600 text-sm" asChild>
+                  <a href="/dashboard/questions/templates">Explore Templates →</a>
+                </Button>
+              </div>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
 
       <div className="grid gap-6 lg:grid-cols-7">
         {/* Monthly Activity Chart */}

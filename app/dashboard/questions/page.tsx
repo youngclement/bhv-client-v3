@@ -13,17 +13,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from '@/components/ui/dialog';
-import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
+
 import {
   Select,
   SelectContent,
@@ -31,10 +21,17 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Plus, Search, Edit2, Trash2, BookOpen, Volume2, PenTool } from 'lucide-react';
+import { Plus, Search, Edit2, Trash2, BookOpen, Volume2, PenTool, Zap, Sparkles, ChevronDown } from 'lucide-react';
 import { authService } from '@/lib/auth';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 
 interface Question {
   _id: string;
@@ -60,11 +57,7 @@ const questionTypes = [
   { value: 'writing', label: 'Writing', icon: PenTool },
 ];
 
-const subTypes = {
-  reading: ['multiple-choice', 'fill-blank', 'true-false', 'matching'],
-  listening: ['multiple-choice', 'fill-blank', 'short-answer'],
-  writing: ['task1', 'task2'],
-};
+
 
 export default function QuestionsPage() {
   const router = useRouter();
@@ -72,18 +65,7 @@ export default function QuestionsPage() {
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedType, setSelectedType] = useState<string>('');
-  const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
-  const [newQuestion, setNewQuestion] = useState({
-    type: 'reading' as 'reading' | 'listening' | 'writing',
-    subType: '',
-    question: '',
-    passage: '',
-    options: ['', '', '', ''],
-    correctAnswer: '',
-    points: 1,
-    difficulty: 'medium' as 'easy' | 'medium' | 'hard',
-    tags: '',
-  });
+
 
   useEffect(() => {
     fetchQuestions();
@@ -100,38 +82,7 @@ export default function QuestionsPage() {
     }
   };
 
-  const handleCreateQuestion = async () => {
-    try {
-      const questionData = {
-        ...newQuestion,
-        tags: newQuestion.tags.split(',').map(tag => tag.trim()).filter(Boolean),
-        options: newQuestion.type === 'reading' ? newQuestion.options : undefined,
-      };
 
-      await authService.apiRequest('/questions', {
-        method: 'POST',
-        body: JSON.stringify(questionData),
-      });
-
-      setIsCreateDialogOpen(false);
-      fetchQuestions();
-      
-      // Reset form
-      setNewQuestion({
-        type: 'reading',
-        subType: '',
-        question: '',
-        passage: '',
-        options: ['', '', '', ''],
-        correctAnswer: '',
-        points: 1,
-        difficulty: 'medium',
-        tags: '',
-      });
-    } catch (error) {
-      console.error('Failed to create question:', error);
-    }
-  };
 
   const filteredQuestions = questions.filter(question => {
     const matchesSearch = question.question.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -166,152 +117,45 @@ export default function QuestionsPage() {
           <p className="text-muted-foreground">Manage your IELTS question bank</p>
         </div>
         
-        <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
-          <DialogTrigger asChild>
-            <Button>
+        <div className="flex items-center gap-2">
+          <Link href="/dashboard/questions/create">
+            <Button variant="outline">
               <Plus className="mr-2 h-4 w-4" />
-              Add Question
+              Single Question
             </Button>
-          </DialogTrigger>
-          <DialogContent className="max-w-2xl">
-            <DialogHeader>
-              <DialogTitle>Create New Question</DialogTitle>
-              <DialogDescription>Add a new question to your question bank</DialogDescription>
-            </DialogHeader>
-            
-            <ScrollArea className="max-h-[70vh] pr-4">
-              <div className="grid gap-4 py-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="type">Question Type</Label>
-                  <Select value={newQuestion.type} onValueChange={(value: any) => setNewQuestion({...newQuestion, type: value, subType: ''})}>
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {questionTypes.map(type => (
-                        <SelectItem key={type.value} value={type.value}>
-                          <div className="flex items-center gap-2">
-                            <type.icon className="h-4 w-4" />
-                            {type.label}
-                          </div>
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                
-                <div className="space-y-2">
-                  <Label htmlFor="subType">Sub Type</Label>
-                  <Select value={newQuestion.subType} onValueChange={(value) => setNewQuestion({...newQuestion, subType: value})}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select sub type" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {subTypes[newQuestion.type].map(subType => (
-                        <SelectItem key={subType} value={subType}>
-                          {subType.replace('-', ' ').replace(/\b\w/g, l => l.toUpperCase())}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-
-              {newQuestion.type === 'reading' && (
-                <div className="space-y-2">
-                  <Label htmlFor="passage">Passage</Label>
-                  <Textarea
-                    placeholder="Enter the reading passage..."
-                    value={newQuestion.passage}
-                    onChange={(e) => setNewQuestion({...newQuestion, passage: e.target.value})}
-                    rows={4}
-                  />
-                </div>
-              )}
-
-              <div className="space-y-2">
-                <Label htmlFor="question">Question</Label>
-                <Textarea
-                  placeholder="Enter your question..."
-                  value={newQuestion.question}
-                  onChange={(e) => setNewQuestion({...newQuestion, question: e.target.value})}
-                  rows={3}
-                />
-              </div>
-
-              {newQuestion.type === 'reading' && newQuestion.subType === 'multiple-choice' && (
-                <div className="space-y-2">
-                  <Label>Options</Label>
-                  {newQuestion.options.map((option, index) => (
-                    <Input
-                      key={index}
-                      placeholder={`Option ${index + 1}`}
-                      value={option}
-                      onChange={(e) => {
-                        const newOptions = [...newQuestion.options];
-                        newOptions[index] = e.target.value;
-                        setNewQuestion({...newQuestion, options: newOptions});
-                      }}
-                    />
-                  ))}
-                </div>
-              )}
-
-              <div className="space-y-2">
-                <Label htmlFor="correctAnswer">Correct Answer</Label>
-                <Input
-                  placeholder="Enter the correct answer..."
-                  value={newQuestion.correctAnswer}
-                  onChange={(e) => setNewQuestion({...newQuestion, correctAnswer: e.target.value})}
-                />
-              </div>
-
-              <div className="grid grid-cols-3 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="points">Points</Label>
-                  <Input
-                    type="number"
-                    min="1"
-                    value={newQuestion.points}
-                    onChange={(e) => setNewQuestion({...newQuestion, points: parseInt(e.target.value)})}
-                  />
-                </div>
-                
-                <div className="space-y-2">
-                  <Label htmlFor="difficulty">Difficulty</Label>
-                  <Select value={newQuestion.difficulty} onValueChange={(value: any) => setNewQuestion({...newQuestion, difficulty: value})}>
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="easy">Easy</SelectItem>
-                      <SelectItem value="medium">Medium</SelectItem>
-                      <SelectItem value="hard">Hard</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                
-                <div className="space-y-2">
-                  <Label htmlFor="tags">Tags</Label>
-                  <Input
-                    placeholder="comma, separated, tags"
-                    value={newQuestion.tags}
-                    onChange={(e) => setNewQuestion({...newQuestion, tags: e.target.value})}
-                  />
-                </div>
-              </div>
-              </div>
-            </ScrollArea>
-
-            <DialogFooter>
-              <Button variant="outline" onClick={() => setIsCreateDialogOpen(false)}>
-                Cancel
+          </Link>
+          
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button>
+                <Zap className="mr-2 h-4 w-4" />
+                Advanced Create
+                <ChevronDown className="ml-2 h-4 w-4" />
               </Button>
-              <Button onClick={handleCreateQuestion}>Create Question</Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-56">
+              <DropdownMenuItem asChild>
+                <Link href="/dashboard/questions/batch" className="flex items-center gap-2 w-full">
+                  <Zap className="h-4 w-4 text-blue-500" />
+                  <div>
+                    <div className="font-medium">Batch Creation</div>
+                    <div className="text-xs text-muted-foreground">Create multiple questions at once</div>
+                  </div>
+                </Link>
+              </DropdownMenuItem>
+              
+              <DropdownMenuItem asChild>
+                <Link href="/dashboard/questions/templates" className="flex items-center gap-2 w-full">
+                  <Sparkles className="h-4 w-4 text-purple-500" />
+                  <div>
+                    <div className="font-medium">Use Template</div>
+                    <div className="text-xs text-muted-foreground">Create from IELTS templates</div>
+                  </div>
+                </Link>
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
       </div>
 
       {/* Filters */}
