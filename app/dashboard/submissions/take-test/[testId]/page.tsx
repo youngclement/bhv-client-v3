@@ -33,6 +33,7 @@ import {
   AlertTriangle
 } from 'lucide-react';
 import { authService } from '@/lib/auth';
+import { AudioPlayer } from '@/components/ui/audio-player';
 
 interface Question {
   _id: string;
@@ -350,15 +351,21 @@ export default function TakeTestPage() {
                     </div>
                   )}
 
-                  {/* Audio */}
-                  {currentQuestion?.audioUrl && (
+                  {/* Audio Player for Listening Questions */}
+                  {currentQuestion?.audioUrl && currentQuestion?.type === 'listening' && (
                     <div className="space-y-2">
-                      <Label className="text-sm font-medium">Audio</Label>
-                      <div className="p-4 bg-muted rounded-lg">
-                        <audio controls className="w-full">
-                          <source src={currentQuestion?.audioUrl} type="audio/mpeg" />
-                          Your browser does not support the audio element.
-                        </audio>
+                      <Label className="text-sm font-medium flex items-center gap-2">
+                        <Volume2 className="h-4 w-4" />
+                        Listening Audio
+                      </Label>
+                      <AudioPlayer 
+                        src={currentQuestion.audioUrl}
+                        title={`Question ${currentQuestionIndex + 1} Audio`}
+                        showDownload={false}
+                        className="border-2 border-blue-200"
+                      />
+                      <div className="text-xs text-muted-foreground p-2 bg-blue-50 rounded">
+                        💡 Listen carefully. You can replay the audio multiple times.
                       </div>
                     </div>
                   )}

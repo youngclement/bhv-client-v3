@@ -13,7 +13,6 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-
 import {
   Select,
   SelectContent,
@@ -27,7 +26,6 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { ScrollArea } from '@/components/ui/scroll-area';
 import { Plus, Search, Edit2, Trash2, BookOpen, Volume2, PenTool, Zap, Sparkles, ChevronDown } from 'lucide-react';
 import { authService } from '@/lib/auth';
 import { useRouter } from 'next/navigation';
@@ -39,6 +37,7 @@ interface Question {
   subType: string;
   question: string;
   passage?: string;
+  audioUrl?: string;
   options?: string[];
   correctAnswer?: string;
   points: number;
@@ -57,15 +56,12 @@ const questionTypes = [
   { value: 'writing', label: 'Writing', icon: PenTool },
 ];
 
-
-
 export default function QuestionsPage() {
   const router = useRouter();
   const [questions, setQuestions] = useState<Question[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedType, setSelectedType] = useState<string>('');
-
 
   useEffect(() => {
     fetchQuestions();
@@ -81,8 +77,6 @@ export default function QuestionsPage() {
       setLoading(false);
     }
   };
-
-
 
   const filteredQuestions = questions.filter(question => {
     const matchesSearch = question.question.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -229,6 +223,12 @@ export default function QuestionsPage() {
                       <div className="text-sm text-muted-foreground capitalize">
                         {question.subType?.replace('-', ' ') || 'N/A'}
                       </div>
+                      {question.type === 'listening' && question.audioUrl && (
+                        <div className="flex items-center gap-1 text-xs text-blue-600 mt-1">
+                          <Volume2 className="h-3 w-3" />
+                          Audio attached
+                        </div>
+                      )}
                       {question.createdBy && (
                         <div className="text-xs text-muted-foreground mt-1">
                           by {question.createdBy.firstName} {question.createdBy.lastName}

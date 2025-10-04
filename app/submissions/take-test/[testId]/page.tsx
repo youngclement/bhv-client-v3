@@ -35,6 +35,7 @@ import {
   Home
 } from 'lucide-react';
 import { authService } from '@/lib/auth';
+import { AudioPlayer } from '@/components/ui/audio-player';
 
 interface Question {
   _id: string;
@@ -644,12 +645,18 @@ export default function TakeTestPage() {
                       {/* Audio for listening passages */}
                       {currentPassage.audioUrl && (
                         <div className="space-y-2">
-                          <Label className="text-sm font-medium">Audio</Label>
-                          <div className="p-4 bg-muted rounded-lg">
-                            <audio controls className="w-full">
-                              <source src={currentPassage.audioUrl} type="audio/mpeg" />
-                              Your browser does not support the audio element.
-                            </audio>
+                          <Label className="text-sm font-medium flex items-center gap-2">
+                            <Volume2 className="h-4 w-4" />
+                            Passage Audio
+                          </Label>
+                          <AudioPlayer 
+                            src={currentPassage.audioUrl}
+                            title={currentPassage.title || 'Passage Audio'}
+                            showDownload={false}
+                            className="border-2 border-green-200"
+                          />
+                          <div className="text-xs text-muted-foreground p-2 bg-green-50 rounded">
+                            🎧 Listen to the passage carefully before answering the questions.
                           </div>
                         </div>
                       )}
@@ -713,6 +720,25 @@ export default function TakeTestPage() {
                           {currentQuestion?.question || currentQuestion?.prompt}
                         </Label>
                       </div>
+
+                      {/* Audio Player for Individual Question */}
+                      {currentQuestion?.audioUrl && currentQuestion?.type === 'listening' && (
+                        <div className="space-y-2">
+                          <Label className="text-sm font-medium flex items-center gap-2">
+                            <Volume2 className="h-4 w-4" />
+                            Question Audio
+                          </Label>
+                          <AudioPlayer 
+                            src={currentQuestion.audioUrl}
+                            title={`Question ${currentQuestion.number || (currentQuestionIndex + 1)} Audio`}
+                            showDownload={false}
+                            className="border-2 border-blue-200"
+                          />
+                          <div className="text-xs text-muted-foreground p-2 bg-blue-50 rounded">
+                            🎧 Listen to this specific question audio before answering.
+                          </div>
+                        </div>
+                      )}
 
                       {currentQuestion?.paragraphRef && (
                         <div className="flex items-start gap-2 p-3 bg-blue-50 rounded-lg border border-blue-200">
