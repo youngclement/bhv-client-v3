@@ -32,7 +32,7 @@ import {
   PenTool,
   Upload,
   File,
-  Image,
+  Image as ImageIcon,
   Music,
   FileText
 } from 'lucide-react';
@@ -52,9 +52,13 @@ interface NewQuestion {
   tags: string[];
   instructions?: string;
   section?: string; // IELTS listening section (1-4)
-  wordLimit?: number; // For completion questions
+  wordLimit?: number; // Writing word limit (150, 250, 400)
+  instructionText?: string; // Detailed writing instructions
+  blanksCount?: number; // Number of blanks for fill-blank
   audioTimestamp?: string; // For specific audio timing
   diagramImage?: string; // For diagram/map/plan labelling
+  imageFile?: File; // Image file for Task 1
+  audioFile?: File; // Audio file for listening
 }
 
 interface FileUpload {
@@ -84,7 +88,9 @@ export default function CreateQuestionPage() {
     tags: [],
     instructions: '',
     section: '1',
-    wordLimit: 3,
+    wordLimit: 150,
+    instructionText: '',
+    blanksCount: 1,
     audioTimestamp: '',
     diagramImage: ''
   });
@@ -121,9 +127,16 @@ export default function CreateQuestionPage() {
       'pick-from-list'
     ],
     writing: [
-      'task-1-academic',
-      'task-1-general',
-      'task-2-essay'
+      // Core Writing Types
+      'essay',                    // ✅ Free writing essay
+      'task1',                   // ✅ IELTS Writing Task 1 (charts, graphs)
+      'task2',                   // ✅ IELTS Writing Task 2 (opinion essay)
+      'short-answer',            // ✅ Short answer questions
+      'fill-blank',              // ✅ Fill in the blanks
+      // Additional Types
+      'multiple-choice',         // ✅ Grammar multiple choice
+      'true-false',              // ✅ True/False grammar
+      'matching'                 // ✅ Matching exercises
     ]
   };
 
@@ -390,6 +403,22 @@ export default function CreateQuestionPage() {
     return isCompletionType() || questionData.subType === 'listening-short-answer';
   };
 
+  const isWritingType = () => {
+    return questionData.type === 'writing';
+  };
+
+  const needsWritingFields = () => {
+    return isWritingType() && ['essay', 'task1', 'task2'].includes(questionData.subType);
+  };
+
+  const needsImageUpload = () => {
+    return questionData.type === 'writing' && questionData.subType === 'task1';
+  };
+
+  const needsAudioUpload = () => {
+    return questionData.type === 'listening';
+  };
+
   const needsDiagramImage = () => {
     return isLabellingType() || questionData.subType === 'diagram-labeling';
   };
@@ -425,6 +454,18 @@ export default function CreateQuestionPage() {
     }
     if (needsWordLimit() && (!questionData.wordLimit || questionData.wordLimit < 1 || questionData.wordLimit > 5)) {
       setError('Word limit must be between 1 and 5 for completion questions');
+      return false;
+    }
+    // Writing specific validation
+    if (needsWritingFields()) {
+      if (!questionData.wordLimit || questionData.wordLimit < 50) {
+        setError('Word limit is required for writing tasks (minimum 50 words)');
+        return false;
+      }
+
+    }
+    if (questionData.type === 'writing' && questionData.subType === 'fill-blank' && (!questionData.blanksCount || questionData.blanksCount < 1)) {
+      setError('Number of blanks is required for fill-blank questions');
       return false;
     }
     if (questionData.points < 1) {
@@ -475,6 +516,13 @@ export default function CreateQuestionPage() {
       if (questionData.type === 'writing') {
         if (questionData.wordLimit && questionData.wordLimit > 0) {
           questionDataToSend.wordLimit = questionData.wordLimit;
+        }
+
+        if (questionData.instructionText?.trim()) {
+          questionDataToSend.instructionText = questionData.instructionText.trim();
+        }
+        if (questionData.blanksCount && questionData.blanksCount > 0) {
+          questionDataToSend.blanksCount = questionData.blanksCount;
         }
       }
 
@@ -739,6 +787,93 @@ export default function CreateQuestionPage() {
                 />
               </div>
 
+              {/* Writing Specific Fields */}
+              {isWritingType() && (
+                <>
+                  {/* Detailed Instructions for Writing */}
+                  <div className="space-y-2">
+                    <Label htmlFor="instructionText">Detailed Writing Instructions</Label>
+                    <Textarea
+                      id="instructionText"
+                      placeholder="Provide detailed instructions for the writing task..."
+                      value={questionData.instructionText}
+                      onChange={(e) => handleInputChange('instructionText', e.target.value)}
+                      rows={4}
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      Detailed guidance for students about the writing task
+                    </p>
+                  </div>
+
+                  {/* Writing Requirements */}
+                  <div className="space-y-2">
+                    <Label htmlFor="writingWordLimit">Word Limit</Label>
+                    <Select 
+                      value={questionData.wordLimit?.toString() || ''} 
+                      onValueChange={(value) => handleInputChange('wordLimit', parseInt(value))}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select word limit..." />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="150">150 words (Task 1)</SelectItem>
+                        <SelectItem value="250">250 words (Task 2)</SelectItem>
+                        <SelectItem value="400">400 words (Extended Essay)</SelectItem>
+                        <SelectItem value="50">50 words (Short Answer)</SelectItem>
+                        <SelectItem value="100">100 words (Medium Answer)</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  {/* Blanks Count for Fill-Blank */}
+                  {questionData.subType === 'fill-blank' && (
+                    <div className="space-y-2">
+                      <Label htmlFor="blanksCount">Number of Blanks</Label>
+                      <Input
+                        id="blanksCount"
+                        type="number"
+                        min="1"
+                        max="20"
+                        value={questionData.blanksCount || ''}
+                        onChange={(e) => handleInputChange('blanksCount', parseInt(e.target.value) || 1)}
+                        placeholder="1"
+                      />
+                      <p className="text-xs text-muted-foreground">
+                        Number of blanks students need to fill
+                      </p>
+                    </div>
+                  )}
+
+                  {/* Image Upload for Task 1 */}
+                  {questionData.subType === 'task1' && (
+                    <div className="space-y-2">
+                      <Label>Upload Chart/Graph/Diagram (Task 1)</Label>
+                      <div className="border-2 border-dashed border-muted-foreground/25 rounded-lg p-6">
+                        <input
+                          type="file"
+                          accept="image/*"
+                          onChange={(e) => {
+                            const file = e.target.files?.[0];
+                            if (file) {
+                              handleInputChange('imageFile', file);
+                            }
+                          }}
+                          className="w-full"
+                        />
+                        <p className="text-sm text-muted-foreground mt-2">
+                          Upload charts, graphs, diagrams, or maps for IELTS Task 1
+                        </p>
+                        {questionData.imageFile && (
+                          <p className="text-sm text-green-600 mt-2">
+                            ✓ {questionData.imageFile.name}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </>
+              )}
+
               {/* Passage for Reading */}
               {needsPassage() && (
                 <div className="space-y-2">
@@ -753,16 +888,60 @@ export default function CreateQuestionPage() {
                 </div>
               )}
 
-              {/* Audio URL for Listening */}
-              {needsAudio() && (
-                <div className="space-y-2">
-                  <Label htmlFor="audioUrl">Audio URL</Label>
-                  <Input
-                    id="audioUrl"
-                    placeholder="https://example.com/audio.mp3"
-                    value={questionData.audioUrl}
-                    onChange={(e) => handleInputChange('audioUrl', e.target.value)}
-                  />
+              {/* Audio Upload/URL for Listening */}
+              {needsAudioUpload() && (
+                <div className="space-y-4">
+                  <Label>Audio Content</Label>
+                  
+                  {/* Audio File Upload */}
+                  <div className="space-y-2">
+                    <Label htmlFor="audioFile">Upload Audio File</Label>
+                    <div className="border-2 border-dashed border-muted-foreground/25 rounded-lg p-6">
+                      <input
+                        type="file"
+                        accept="audio/*"
+                        onChange={(e) => {
+                          const file = e.target.files?.[0];
+                          if (file) {
+                            handleInputChange('audioFile', file);
+                            handleInputChange('audioUrl', ''); // Clear URL if file is selected
+                          }
+                        }}
+                        className="w-full"
+                      />
+                      <p className="text-sm text-muted-foreground mt-2">
+                        Upload MP3, WAV, or other audio files
+                      </p>
+                      {questionData.audioFile && (
+                        <p className="text-sm text-green-600 mt-2">
+                          ✓ {questionData.audioFile.name}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="text-center text-muted-foreground">
+                    OR
+                  </div>
+
+                  {/* Audio URL */}
+                  <div className="space-y-2">
+                    <Label htmlFor="audioUrl">Audio URL</Label>
+                    <Input
+                      id="audioUrl"
+                      placeholder="https://example.com/audio.mp3"
+                      value={questionData.audioUrl}
+                      onChange={(e) => {
+                        handleInputChange('audioUrl', e.target.value);
+                        if (e.target.value) {
+                          handleInputChange('audioFile', undefined); // Clear file if URL is entered
+                        }
+                      }}
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      Direct link to audio file online
+                    </p>
+                  </div>
                 </div>
               )}
 
@@ -855,7 +1034,7 @@ export default function CreateQuestionPage() {
                         >
                           <div className="flex-shrink-0">
                             {fileUpload.type === 'audio' && <Music className="h-4 w-4 text-blue-500" />}
-                            {fileUpload.type === 'image' && <Image className="h-4 w-4 text-green-500" />}
+                            {fileUpload.type === 'image' && <ImageIcon className="h-4 w-4 text-green-500" />}
                             {fileUpload.type === 'document' && <FileText className="h-4 w-4 text-orange-500" />}
                           </div>
                           <div className="flex-1 min-w-0 space-y-1">
