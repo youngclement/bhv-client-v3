@@ -137,14 +137,6 @@ export default function TestResultsPage() {
   }, [router]);
 
   useEffect(() => {
-    // Auto-redirect back to tests list after viewing results
-    const timer = setTimeout(() => {
-      router.push('/submissions');
-    }, 8000);
-    return () => clearTimeout(timer);
-  }, [router]);
-
-  useEffect(() => {
     if (params.submissionId) {
       fetchResults(params.submissionId as string);
     }

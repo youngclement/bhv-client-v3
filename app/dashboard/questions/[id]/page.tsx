@@ -27,8 +27,9 @@ import {
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { ArrowLeft, Edit2, Trash2, Save, X, BookOpen, Volume2, PenTool } from 'lucide-react';
+import { ArrowLeft, Edit2, Trash2, Save, X, BookOpen, Volume2, PenTool, Upload, File as FileIcon } from 'lucide-react';
 import { authService } from '@/lib/auth';
+import { AudioPlayer } from '@/components/ui/audio-player';
 
 interface Question {
   _id: string;
@@ -37,11 +38,32 @@ interface Question {
   question: string;
   passage?: string;
   audioUrl?: string;
+  audioFile?: {
+    url: string;
+    publicId?: string;
+    originalName?: string;
+    format?: string;
+    bytes?: number;
+    duration?: number;
+  };
+  imageFile?: {
+    url: string;
+    publicId?: string;
+    originalName?: string;
+    format?: string;
+    bytes?: number;
+    width?: number;
+    height?: number;
+  };
   options?: string[];
   correctAnswer?: string;
   points: number;
   difficulty: 'easy' | 'medium' | 'hard';
   tags: string[];
+  section?: number;
+  wordLimit?: number;
+  blanksCount?: number;
+  instructionText?: string;
   createdBy: {
     _id: string;
     firstName: string;
@@ -55,9 +77,23 @@ interface Question {
 type EditQuestion = Partial<Omit<Question, 'tags'>> & { tags: string };
 
 const subTypes = {
-  reading: ['multiple-choice', 'fill-blank', 'true-false', 'matching'],
-  listening: ['multiple-choice', 'fill-blank', 'short-answer'],
-  writing: ['task1', 'task2'],
+  reading: ['multiple-choice', 'fill-blank', 'true-false', 'matching', 'short-answer', 'sentence-completion', 'summary-completion'],
+  listening: [
+    'listening-multiple-choice',
+    'form-completion',
+    'note-completion',
+    'table-completion',
+    'flowchart-completion',
+    'sentence-completion',
+    'summary-completion',
+    'diagram-labelling',
+    'map-labelling',
+    'plan-labelling',
+    'listening-matching',
+    'listening-short-answer',
+    'pick-from-list'
+  ],
+  writing: ['task1', 'task2', 'essay'],
 };
 
 export default function QuestionDetailPage() {
@@ -68,6 +104,8 @@ export default function QuestionDetailPage() {
   const [isEditing, setIsEditing] = useState(false);
   const [saving, setSaving] = useState(false);
   const [editData, setEditData] = useState<EditQuestion>({ tags: '' });
+  const [audioFile, setAudioFile] = useState<File | null>(null);
+  const [imageFile, setImageFile] = useState<File | null>(null);
 
   useEffect(() => {
     if (params.id) {
@@ -95,21 +133,103 @@ export default function QuestionDetailPage() {
 
     setSaving(true);
     try {
-      const updateData = {
-        ...editData,
-        tags: (editData.tags || '')
-          .split(',')
-          .map((tag: string) => tag.trim())
-          .filter(Boolean),
+      const tags = (editData.tags || '')
+        .split(',')
+        .map((tag: string) => tag.trim())
+        .filter(Boolean);
+
+      // Clean and filter data based on question type - only send core required fields
+      const questionDataToSend: any = {
+        type: editData.type,
+        subType: editData.subType,
+        question: editData.question,
+        points: editData.points,
+        difficulty: editData.difficulty,
       };
 
-      await authService.apiRequest(`/questions/${question._id}`, {
-        method: 'PUT',
-        body: JSON.stringify(updateData),
+      // Only add tags if they exist and are not empty
+      if (tags && tags.length > 0) {
+        questionDataToSend.tags = tags;
+      }
+
+      // Add type-specific fields
+      if (editData.type === 'reading' && editData.passage?.trim()) {
+        questionDataToSend.passage = editData.passage.trim();
+      }
+
+      if (editData.type === 'listening') {
+        if (editData.section) {
+          questionDataToSend.section = editData.section;
+        }
+        if (editData.wordLimit && editData.wordLimit > 0) {
+          questionDataToSend.wordLimit = editData.wordLimit;
+        }
+      }
+
+      if (editData.type === 'writing') {
+        if (editData.wordLimit && editData.wordLimit > 0) {
+          questionDataToSend.wordLimit = editData.wordLimit;
+        }
+      }
+
+      // Add options for multiple choice questions
+      if (editData.options && editData.options.some(opt => opt.trim())) {
+        const filteredOptions = editData.options.filter(opt => opt.trim());
+        if (filteredOptions.length > 0) {
+          questionDataToSend.options = filteredOptions;
+        }
+      }
+
+      // Add correct answer if provided
+      if (editData.correctAnswer?.trim()) {
+        questionDataToSend.correctAnswer = editData.correctAnswer.trim();
+      }
+
+      // Always send as FormData for consistency with create endpoint
+      const formData = new FormData();
+      
+      // Add each field individually instead of as JSON string
+      Object.entries(questionDataToSend).forEach(([key, value]) => {
+        if (Array.isArray(value)) {
+          // Handle arrays (like options, tags)
+          formData.append(key, JSON.stringify(value));
+        } else {
+          formData.append(key, String(value));
+        }
       });
+      
+      // Add files if they exist
+      if (audioFile) {
+        formData.append('audioFile', audioFile);
+      }
+      if (imageFile) {
+        formData.append('imageFile', imageFile);
+      }
+
+      console.log('Updating question with FormData:', {
+        questionData: questionDataToSend,
+        hasAudio: !!audioFile,
+        hasImage: !!imageFile
+      });
+
+      // Use fetch directly for FormData to match create endpoint
+      const response = await fetch(`http://localhost:8000/api/questions/${question._id}`, {
+        method: 'PUT',
+        headers: {
+          'Authorization': `Bearer ${authService.getToken()}`
+        },
+        body: formData
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`API request failed: ${response.status} - ${errorText}`);
+      }
 
       await fetchQuestion(question._id);
       setIsEditing(false);
+      setAudioFile(null);
+      setImageFile(null);
     } catch (error) {
       console.error('Failed to update question:', error);
     } finally {
@@ -305,12 +425,85 @@ export default function QuestionDetailPage() {
                       )}
 
                       {editData.type === 'listening' && (
-                        <div className="space-y-2">
-                          <Label>Audio URL</Label>
-                          <Input
-                            value={editData.audioUrl || ''}
-                            onChange={(e) => setEditData({ ...editData, audioUrl: e.target.value })}
-                          />
+                        <div className="space-y-4">
+                          {/* Current Audio */}
+                          {question.audioFile?.url && !audioFile && (
+                            <div className="space-y-2">
+                              <Label className="text-sm font-medium flex items-center gap-2">
+                                <Volume2 className="h-4 w-4" />
+                                Current Audio
+                              </Label>
+                              <AudioPlayer
+                                src={question.audioFile.url}
+                                title={question.audioFile.originalName || 'Question Audio'}
+                                showDownload={false}
+                                className="w-full"
+                              />
+                              <p className="text-xs text-muted-foreground">
+                                {question.audioFile.originalName} • {Math.round(question.audioFile.bytes! / 1024)}KB
+                              </p>
+                            </div>
+                          )}
+
+                          {/* Upload New Audio */}
+                          <div className="space-y-2">
+                            <Label className="text-sm font-medium">Upload New Audio File</Label>
+                            <div className="flex items-center gap-2">
+                              <Input
+                                type="file"
+                                accept="audio/*"
+                                onChange={(e) => {
+                                  const file = e.target.files?.[0];
+                                  if (file) {
+                                    setAudioFile(file);
+                                  }
+                                }}
+                                className="flex-1"
+                              />
+                              {audioFile && (
+                                <Button
+                                  type="button"
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => setAudioFile(null)}
+                                >
+                                  <X className="h-4 w-4" />
+                                </Button>
+                              )}
+                            </div>
+                            {audioFile && (
+                              <div className="flex items-center gap-2 text-sm text-green-600">
+                                <FileIcon className="h-4 w-4" />
+                                <span>New file selected: {audioFile.name}</span>
+                              </div>
+                            )}
+                          </div>
+
+                          {/* Section & Word Limit for listening completion types */}
+                          <div className="grid grid-cols-2 gap-4">
+                            <div className="space-y-2">
+                              <Label>Section (1-4)</Label>
+                              <Input
+                                type="number"
+                                min="1"
+                                max="4"
+                                value={editData.section || 1}
+                                onChange={(e) => setEditData({ ...editData, section: parseInt(e.target.value) })}
+                              />
+                            </div>
+                            {(editData.subType?.includes('completion') || editData.subType === 'listening-short-answer') && (
+                              <div className="space-y-2">
+                                <Label>Word Limit (1-5)</Label>
+                                <Input
+                                  type="number"
+                                  min="1"
+                                  max="5"
+                                  value={editData.wordLimit || 2}
+                                  onChange={(e) => setEditData({ ...editData, wordLimit: parseInt(e.target.value) })}
+                                />
+                              </div>
+                            )}
+                          </div>
                         </div>
                       )}
 
@@ -398,23 +591,85 @@ export default function QuestionDetailPage() {
                         </div>
                       )}
 
-                      {question.audioUrl && (
+                      {/* Audio for Listening Questions */}
+                      {question.type === 'listening' && question.audioFile?.url && (
                         <div className="space-y-2">
-                          <Label className="text-sm font-medium">Audio</Label>
-                          <div className="p-4 bg-muted rounded-lg">
-                            <audio controls className="w-full">
-                              <source src={question.audioUrl} type="audio/mpeg" />
-                              Your browser does not support the audio element.
-                            </audio>
+                          <div className="flex items-center gap-2">
+                            <Volume2 className="h-5 w-5 text-purple-600" />
+                            <Label className="text-sm font-semibold">Question Audio</Label>
+                            {question.section && (
+                              <Badge variant="outline" className="border-purple-300 text-purple-700">
+                                Section {question.section}
+                              </Badge>
+                            )}
+                          </div>
+                          <AudioPlayer
+                            src={question.audioFile.url}
+                            title={question.audioFile.originalName || 'Question Audio'}
+                            showDownload={false}
+                            className="w-full"
+                          />
+                          <div className="text-xs text-muted-foreground">
+                            {question.audioFile.originalName} • 
+                            {question.audioFile.duration && ` ${Math.round(question.audioFile.duration)}s • `}
+                            {Math.round(question.audioFile.bytes! / 1024)}KB
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Image for Questions with imageFile */}
+                      {question.imageFile?.url && (
+                        <div className="space-y-2">
+                          <Label className="text-sm font-semibold">Reference Image</Label>
+                          <div className="rounded-lg border border-slate-200 overflow-hidden bg-slate-50">
+                            <img
+                              src={question.imageFile.url}
+                              alt={question.imageFile.originalName || 'Question image'}
+                              className="w-full h-auto max-h-96 object-contain"
+                            />
+                          </div>
+                          <div className="text-xs text-muted-foreground">
+                            {question.imageFile.originalName} • 
+                            {question.imageFile.width}×{question.imageFile.height} • 
+                            {Math.round(question.imageFile.bytes! / 1024)}KB
                           </div>
                         </div>
                       )}
 
                       <div className="space-y-2">
                         <Label className="text-sm font-medium">Question</Label>
-                        <div className="p-4 bg-muted rounded-lg">
+                        <div className="p-4 bg-muted rounded-lg space-y-2">
                           <p className="text-sm leading-relaxed">{question.question}</p>
+                          {question.instructionText && (
+                            <p className="text-xs text-muted-foreground italic border-l-2 border-blue-300 pl-2">
+                              {question.instructionText}
+                            </p>
+                          )}
                         </div>
+                        {/* Word Limit & Blanks Count */}
+                        {(question.wordLimit || question.blanksCount) && (
+                          <div className="flex flex-wrap gap-2">
+                            {question.wordLimit && (
+                              <Badge variant="outline" className="border-blue-300 text-blue-700">
+                                Word Limit: {question.wordLimit}
+                                {question.wordLimit <= 5 && (
+                                  <span className="ml-1 text-xs">
+                                    ({question.wordLimit === 1 ? 'ONE WORD ONLY' : 
+                                      question.wordLimit === 2 ? 'TWO WORDS' :
+                                      question.wordLimit === 3 ? 'THREE WORDS' :
+                                      question.wordLimit === 4 ? 'FOUR WORDS' :
+                                      'FIVE WORDS'})
+                                  </span>
+                                )}
+                              </Badge>
+                            )}
+                            {question.blanksCount && (
+                              <Badge variant="outline" className="border-green-300 text-green-700">
+                                Blanks: {question.blanksCount}
+                              </Badge>
+                            )}
+                          </div>
+                        )}
                       </div>
 
                       {question.options && question.options.length > 0 && (

@@ -460,12 +460,11 @@ export default function TakeTestPage() {
               </div>
               <div className="border-l border-slate-300 pl-3 hidden sm:block">
                 <div className="flex items-center gap-2">
-                  <div className={`flex h-6 w-6 items-center justify-center rounded-lg ${
-                    test.type === 'reading' ? 'bg-blue-100 text-blue-600' :
-                    test.type === 'listening' ? 'bg-purple-100 text-purple-600' :
-                    test.type === 'writing' ? 'bg-green-100 text-green-600' :
-                    'bg-slate-100 text-slate-600'
-                  }`}>
+                  <div className={`flex h-6 w-6 items-center justify-center rounded-lg ${test.type === 'reading' ? 'bg-blue-100 text-blue-600' :
+                      test.type === 'listening' ? 'bg-purple-100 text-purple-600' :
+                        test.type === 'writing' ? 'bg-green-100 text-green-600' :
+                          'bg-slate-100 text-slate-600'
+                    }`}>
                     {getTypeIcon(test.type)}
                   </div>
                   <div>
@@ -477,27 +476,24 @@ export default function TakeTestPage() {
             </div>
 
             <div className="flex items-center gap-2 sm:gap-3">
-              <Button 
-                variant="ghost" 
-                size="sm" 
-                onClick={() => router.push('/submissions')} 
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => router.push('/submissions')}
                 className="gap-2 hover:bg-slate-100 text-slate-700"
               >
                 <Home className="h-4 w-4" />
                 <span className="hidden sm:inline">Back</span>
               </Button>
-              <div className={`flex items-center gap-2 px-3 py-2 rounded-lg transition-colors ${
-                timeRemaining < 300 
-                  ? 'border-2 border-red-300' 
+              <div className={`flex items-center gap-2 px-3 py-2 rounded-lg transition-colors ${timeRemaining < 300
+                  ? 'border-2 border-red-300'
                   : ''
-              }`}>
-                <Clock className={`h-4 w-4 sm:h-5 sm:w-5 ${
-                  timeRemaining < 300 ? 'text-red-600 animate-pulse' : 'text-[#004875]'
-                }`} />
+                }`}>
+                <Clock className={`h-4 w-4 sm:h-5 sm:w-5 ${timeRemaining < 300 ? 'text-red-600 animate-pulse' : 'text-[#004875]'
+                  }`} />
                 <div className="text-right">
-                  <div className={`font-mono text-base sm:text-lg font-bold leading-tight ${
-                    timeRemaining < 300 ? 'text-red-600' : 'text-[#004875]'
-                  }`}>
+                  <div className={`font-mono text-base sm:text-lg font-bold leading-tight ${timeRemaining < 300 ? 'text-red-600' : 'text-[#004875]'
+                    }`}>
                     {formatTime(timeRemaining)}
                   </div>
                   {timeRemaining < 300 && (
@@ -542,10 +538,9 @@ export default function TakeTestPage() {
               <Card className="mb-6 border-slate-200 shadow-sm">
                 <CardHeader className="border-b border-slate-100 bg-slate-50/50">
                   <CardTitle className="flex items-center gap-3">
-                    <div className={`h-8 w-8 rounded-lg flex items-center justify-center ${
-                      currentPassage.type === 'reading' ? 'bg-blue-100' :
-                      currentPassage.type === 'listening' ? 'bg-purple-100' : 'bg-slate-100'
-                    }`}>
+                    <div className={`h-8 w-8 rounded-lg flex items-center justify-center ${currentPassage.type === 'reading' ? 'bg-blue-100' :
+                        currentPassage.type === 'listening' ? 'bg-purple-100' : 'bg-slate-100'
+                      }`}>
                       {getTypeIcon(currentPassage.type)}
                     </div>
                     <span className="text-slate-900">{currentPassage.title}</span>
@@ -678,6 +673,16 @@ export default function TakeTestPage() {
                         <Label className="text-base font-semibold text-slate-900 leading-relaxed">
                           {currentQuestion?.question || currentQuestion?.prompt}
                         </Label>
+                        {currentQuestion?.instructionText && (
+                          <p className="text-sm text-slate-600 mt-2 italic">
+                            {currentQuestion.instructionText}
+                          </p>
+                        )}
+                        {currentQuestion?.wordLimit && (
+                          <Badge variant="outline" className="mt-2 border-blue-300 text-blue-700">
+                            Word limit: {currentQuestion.wordLimit} words
+                          </Badge>
+                        )}
                       </div>
 
                       {/* Writing Word Limit */}
@@ -970,7 +975,7 @@ export default function TakeTestPage() {
                     </div>
                 </div>
               </CardContent>
-              
+
               {/* Navigation - Moved here for better UX */}
               <CardContent className="border-t border-slate-100 bg-slate-50/30 py-4">
                 <div className="flex items-center gap-3">
@@ -1010,19 +1015,18 @@ export default function TakeTestPage() {
                     {allQuestions?.map((question, index) => {
                       const isAnswered = !!answers[getAnswerKey(question, index)];
                       const isCurrent = currentQuestionIndex === index;
-                      
+
                       return (
                         <Button
                           key={index}
                           variant={isCurrent ? "default" : "outline"}
                           size="sm"
-                          className={`h-8 w-8 p-0 text-xs font-semibold transition-all ${
-                            isCurrent 
+                          className={`h-8 w-8 p-0 text-xs font-semibold transition-all ${isCurrent
                               ? 'bg-[#004875] hover:bg-[#003a5c] text-white border-[#004875] shadow-md'
                               : isAnswered
-                              ? 'bg-green-50 border-green-400 text-green-700 hover:bg-green-100'
-                              : 'border-slate-300 hover:bg-slate-100 hover:border-slate-400'
-                          }`}
+                                ? 'bg-green-50 border-green-400 text-green-700 hover:bg-green-100'
+                                : 'border-slate-300 hover:bg-slate-100 hover:border-slate-400'
+                            }`}
                           onClick={() => {
                             setCurrentQuestionIndex(index);
                             updateCurrentPassage(index);
@@ -1057,7 +1061,7 @@ export default function TakeTestPage() {
               <CardContent className="p-4">
                 <AlertDialog>
                   <AlertDialogTrigger asChild>
-                    <Button 
+                    <Button
                       className="w-full bg-gradient-to-r from-[#004875] to-[#003a5c] hover:from-[#003a5c] hover:to-[#002a3c] text-white shadow-md font-semibold py-6 text-base"
                       disabled={submitting}
                     >

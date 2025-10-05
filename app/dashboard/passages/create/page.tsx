@@ -116,6 +116,9 @@ export default function CreatePassagePage() {
         payload.audioUrl = passage.audioUrl;
       }
       
+      console.log('📤 Creating passage with payload:', payload);
+      console.log('📊 Payload JSON:', JSON.stringify(payload, null, 2));
+      
       await authService.apiRequest('/passages', {
         method: 'POST',
         body: JSON.stringify(payload)

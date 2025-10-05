@@ -35,6 +35,7 @@ import {
 } from 'lucide-react';
 import { authService } from '@/lib/auth';
 import Image from 'next/image';
+import { AudioPlayer } from '@/components/ui/audio-player';
 
 interface Question {
   _id: string;
@@ -108,29 +109,6 @@ export default function TakeTestPage() {
   const assignmentId = searchParams.get('assignment');
   const existingSubmissionId = searchParams.get('submission');
 
-  useEffect(() => {
-    if (params.testId) {
-      initializeTest(params.testId as string);
-    }
-  }, [params.testId, initializeTest]);
-
-  // Timer effect
-  useEffect(() => {
-    if (timeRemaining > 0) {
-      const timer = setInterval(() => {
-        setTimeRemaining(prev => {
-          if (prev <= 1) {
-            handleSubmitTest();
-            return 0;
-          }
-          return prev - 1;
-        });
-      }, 1000);
-
-      return () => clearInterval(timer);
-    }
-  }, [timeRemaining, handleSubmitTest]);
-
   const handleSubmitTest = useCallback(async () => {
     if (!submissionId) return;
 
@@ -167,6 +145,29 @@ export default function TakeTestPage() {
       setLoading(false);
     }
   }, [assignmentId, existingSubmissionId]);
+
+  useEffect(() => {
+    if (params.testId) {
+      initializeTest(params.testId as string);
+    }
+  }, [params.testId, initializeTest]);
+
+  // Timer effect
+  useEffect(() => {
+    if (timeRemaining > 0) {
+      const timer = setInterval(() => {
+        setTimeRemaining(prev => {
+          if (prev <= 1) {
+            handleSubmitTest();
+            return 0;
+          }
+          return prev - 1;
+        });
+      }, 1000);
+
+      return () => clearInterval(timer);
+    }
+  }, [timeRemaining, handleSubmitTest]);
 
   const handleAnswerChange = useCallback(async (questionId: string, answer: string) => {
     setAnswers(prev => ({ ...prev, [questionId]: answer }));
@@ -368,23 +369,25 @@ export default function TakeTestPage() {
                   {/* Audio for Listening Questions */}
                   {(currentQuestion?.audioFile || currentQuestion?.audioUrl) && currentQuestion?.type === 'listening' && (
                     <div className="space-y-2">
-                      <Label className="text-sm font-medium flex items-center gap-2">
-                        <Volume2 className="h-4 w-4" />
-                        Listening Audio
-                      </Label>
-                      <div className="p-4 bg-blue-50 rounded-lg border border-blue-200">
-                        <audio controls className="w-full mb-2">
-                          <source src={currentQuestion.audioFile?.url || currentQuestion.audioUrl} type="audio/mpeg" />
-                          Your browser does not support the audio element.
-                        </audio>
-                        {currentQuestion.audioFile && (
-                          <div className="text-xs text-muted-foreground">
-                            {currentQuestion.audioFile.originalName} • {currentQuestion.audioFile.duration ? `${Math.round(currentQuestion.audioFile.duration)}s` : ''} • {Math.round(currentQuestion.audioFile.bytes / 1024)}KB
-                          </div>
+                      <div className="flex items-center gap-2 mb-3">
+                        <Volume2 className="h-5 w-5 text-purple-600" />
+                        <Label className="text-sm font-semibold text-slate-700">
+                          Listen to the audio
+                        </Label>
+                        {currentQuestion?.section && (
+                          <Badge variant="outline" className="ml-2 border-purple-300 text-purple-700">
+                            Section {currentQuestion.section}
+                          </Badge>
                         )}
-                        <div className="text-xs text-muted-foreground mt-2">
-                          💡 You can replay the audio multiple times. Listen carefully before answering.
-                        </div>
+                      </div>
+                      <AudioPlayer
+                        src={currentQuestion.audioFile?.url || currentQuestion.audioUrl || ''}
+                        title={currentQuestion.audioFile?.originalName || `Question ${currentQuestionIndex + 1} Audio`}
+                        showDownload={false}
+                        className="w-full"
+                      />
+                      <div className="text-xs text-muted-foreground mt-2 p-2 bg-blue-50 rounded border border-blue-100">
+                        💡 You can replay the audio multiple times. Listen carefully before answering.
                       </div>
                     </div>
                   )}
