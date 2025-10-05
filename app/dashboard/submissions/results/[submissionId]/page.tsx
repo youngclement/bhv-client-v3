@@ -23,16 +23,39 @@ import {
 } from 'lucide-react';
 import { authService } from '@/lib/auth';
 import { format } from 'date-fns';
+import { AudioPlayer } from '@/components/ui/audio-player';
 
 interface Question {
   _id: string;
-  number: number;
+  number?: number;
   type: string;
-  prompt: string;
+  subType?: string;
+  prompt?: string;
+  question?: string;
   options?: string[];
   paragraphRef?: string;
   correctAnswer?: string;
   points?: number;
+  audioFile?: {
+    url: string;
+    publicId?: string;
+    originalName?: string;
+    format?: string;
+    bytes?: number;
+    duration?: number;
+  };
+  imageFile?: {
+    url: string;
+    publicId?: string;
+    originalName?: string;
+    format?: string;
+    bytes?: number;
+    width?: number;
+    height?: number;
+  };
+  section?: number;
+  instructionText?: string;
+  wordLimit?: number;
 }
 
 interface Section {
@@ -112,13 +135,6 @@ export default function TestResultsPage() {
   const [questionIndex, setQuestionIndex] = useState<Record<string, any>>({});
   const questionIndexMap = questionIndex;
   const [loading, setLoading] = useState(true);
-  useEffect(() => {
-    // Auto-redirect back to tests list after viewing results
-    const timer = setTimeout(() => {
-      router.push('/dashboard/submissions');
-    }, 8000);
-    return () => clearTimeout(timer);
-  }, [router]);
 
   useEffect(() => {
     if (params.submissionId) {
@@ -140,6 +156,10 @@ export default function TestResultsPage() {
         (p?.questionSections || []).forEach((s: any) => {
           (s?.questions || []).forEach((q: any) => { if (typeof q === 'string') ids.push(q); });
         });
+      });
+      // Also handle direct questions (not in passages)
+      (data?.testId?.questions || []).forEach((q: any) => {
+        if (typeof q === 'string') ids.push(q);
       });
       const unique = Array.from(new Set(ids));
       const idx: Record<string, any> = {};
@@ -221,7 +241,9 @@ export default function TestResultsPage() {
 
   // Build question map from passages (supports questionSections with IDs and legacy sections without IDs)
   const questionMap = new Map<string, { question: any; passage: any; section: any }>();
-  result.testId.passages.forEach((passage: any) => {
+  
+  // Handle passages with questions
+  (result.testId.passages || []).forEach((passage: any) => {
     if (passage?.questionSections?.length) {
       passage.questionSections.forEach((section: any) => {
         (section.questions || []).forEach((q: any) => {
@@ -242,6 +264,14 @@ export default function TestResultsPage() {
           }
         });
       });
+    }
+  });
+
+  // Handle direct questions (not in passages) - for listening/writing tests
+  (result.testId.questions || []).forEach((q: any) => {
+    const question = typeof q === 'string' ? questionIndex[q] : q;
+    if (question?._id) {
+      questionMap.set(question._id, { question, passage: null, section: null });
     }
   });
 
@@ -403,8 +433,166 @@ export default function TestResultsPage() {
                 <CardContent>
                   <ScrollArea className="h-[70vh]">
                     <div className="space-y-6">
+                      {/* Direct Questions (no passages) - for listening/writing tests */}
+                      {result.testId.questions && result.testId.questions.length > 0 && (
+                        <div className="space-y-4">
+                          <div className="border-l-4 border-primary pl-4">
+                            <h3 className="text-lg font-semibold flex items-center gap-2">
+                              {getTypeIcon(result.testId.type)}
+                              {result.testId.title}
+                            </h3>
+                          </div>
+
+                          <div className="space-y-3">
+                            {result.testId.questions.map((q: any, qIndex: number) => {
+                              const question: any = typeof q === 'string' ? questionIndexMap[q] : q;
+                              if (!question) return null;
+                              
+                              const answer = result.answers.find(a => a.questionId === question._id);
+                              const questionWithAnswer = questionsWithAnswers.find(qa => qa.question._id === question._id);
+                              const isCorrect = questionWithAnswer?.isCorrect || false;
+                              const correctDisplay = question.correctAnswer || question.answer;
+
+                              return (
+                                <div key={question._id || qIndex} className="border rounded-lg p-4 space-y-4">
+                                  <div className="flex items-start justify-between mb-3">
+                                    <div className="flex items-center gap-2 flex-wrap">
+                                      <span className="font-medium">Question {qIndex + 1}</span>
+                                      <Badge variant="outline" className="text-xs">
+                                        {(question.subType || question.type || '').replace(/-/g, ' ')}
+                                      </Badge>
+                                      {question.section && (
+                                        <Badge variant="outline" className="text-xs border-purple-300 text-purple-700">
+                                          Section {question.section}
+                                        </Badge>
+                                      )}
+                                      <Badge variant="outline" className="text-xs">
+                                        {question.points || 1} {question.points === 1 ? 'point' : 'points'}
+                                      </Badge>
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                      {isCorrect ? (
+                                        <CheckCircle className="h-5 w-5 text-green-600" />
+                                      ) : (
+                                        <XCircle className="h-5 w-5 text-red-600" />
+                                      )}
+                                      <span className="text-sm text-muted-foreground">
+                                        {formatTime(answer?.timeSpent || 0)}
+                                      </span>
+                                    </div>
+                                  </div>
+
+                                  {/* Audio Player for Listening Questions */}
+                                  {question.audioFile?.url && question.type === 'listening' && (
+                                    <div className="space-y-2">
+                                      <div className="flex items-center gap-2">
+                                        <Volume2 className="h-4 w-4 text-purple-600" />
+                                        <span className="text-sm font-medium">Audio</span>
+                                      </div>
+                                      <AudioPlayer
+                                        src={question.audioFile.url}
+                                        title={question.audioFile.originalName || 'Question Audio'}
+                                        showDownload={false}
+                                        className="w-full"
+                                      />
+                                    </div>
+                                  )}
+
+                                  {/* Image for Questions with imageFile */}
+                                  {question.imageFile?.url && (
+                                    <div className="space-y-2">
+                                      <span className="text-sm font-medium">Reference Image</span>
+                                      <div className="rounded-lg border border-slate-200 overflow-hidden bg-slate-50">
+                                        <img
+                                          src={question.imageFile.url}
+                                          alt={question.imageFile.originalName || 'Question image'}
+                                          className="w-full h-auto max-h-96 object-contain"
+                                        />
+                                      </div>
+                                    </div>
+                                  )}
+
+                                  <div className="space-y-3">
+                                    <div>
+                                      <p className="font-medium text-sm mb-2">Question:</p>
+                                      <p className="text-sm">{question.question || question.prompt}</p>
+                                      {question.instructionText && (
+                                        <p className="text-xs text-muted-foreground mt-1 italic">{question.instructionText}</p>
+                                      )}
+                                      {question.wordLimit && (
+                                        <Badge variant="outline" className="mt-2 text-xs border-blue-300 text-blue-700">
+                                          Word limit: {question.wordLimit}
+                                        </Badge>
+                                      )}
+                                    </div>
+
+                                    {/* Options for Multiple Choice */}
+                                    {question.options && question.options.length > 0 && (
+                                      <div>
+                                        <p className="font-medium text-sm mb-1">Options:</p>
+                                        <div className="space-y-1">
+                                          {question.options.map((option: string, idx: number) => (
+                                            <div
+                                              key={idx}
+                                              className={`p-2 rounded text-sm border ${
+                                                option === answer?.answer && option === correctDisplay
+                                                  ? 'bg-green-50 border-green-300 text-green-800'
+                                                  : option === answer?.answer
+                                                  ? 'bg-red-50 border-red-300 text-red-800'
+                                                  : option === correctDisplay
+                                                  ? 'bg-green-50 border-green-300 text-green-800'
+                                                  : 'bg-white border-slate-200'
+                                              }`}
+                                            >
+                                              <span className="font-medium mr-2">{String.fromCharCode(65 + idx)}.</span>
+                                              {option}
+                                              {option === correctDisplay && (
+                                                <span className="ml-2 text-green-600 font-medium">✓ Correct</span>
+                                              )}
+                                            </div>
+                                          ))}
+                                        </div>
+                                      </div>
+                                    )}
+
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                      <div>
+                                        <p className="font-medium text-sm mb-1">Your Answer:</p>
+                                        <div className={`p-2 rounded text-sm ${
+                                          isCorrect
+                                            ? 'bg-green-50 text-green-800 border border-green-200'
+                                            : 'bg-red-50 text-red-800 border border-red-200'
+                                        }`}>
+                                          {answer?.answer || 'No answer provided'}
+                                        </div>
+                                      </div>
+
+                                      {correctDisplay && (
+                                        <div>
+                                          <p className="font-medium text-sm mb-1">Correct Answer:</p>
+                                          <div className="p-2 rounded text-sm bg-green-50 text-green-800 border border-green-200">
+                                            {correctDisplay}
+                                          </div>
+                                        </div>
+                                      )}
+                                    </div>
+
+                                    <div className="flex justify-between text-xs text-muted-foreground pt-2 border-t">
+                                      <span>Status: <span className={isCorrect ? 'text-green-600 font-medium' : 'text-red-600 font-medium'}>
+                                        {isCorrect ? 'Correct ✓' : 'Incorrect ✗'}
+                                      </span></span>
+                                      <span>Time spent: {formatTime(answer?.timeSpent || 0)}</span>
+                                    </div>
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      )}
+
                       {/* Group by passage */}
-                      {result.testId.passages.map((passage, passageIndex) => (
+                      {result.testId.passages && result.testId.passages.length > 0 && result.testId.passages.map((passage, passageIndex) => (
                         <div key={passage._id} className="space-y-4">
                           {/* Passage Header */}
                           <div className="border-l-4 border-primary pl-4">

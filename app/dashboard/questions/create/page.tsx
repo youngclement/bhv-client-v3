@@ -88,7 +88,7 @@ export default function CreateQuestionPage() {
     tags: [],
     instructions: '',
     section: '1',
-    wordLimit: 150,
+    wordLimit: 2,
     instructionText: '',
     blanksCount: 1,
     audioTimestamp: '',
@@ -141,10 +141,33 @@ export default function CreateQuestionPage() {
   };
 
   const handleInputChange = (field: keyof NewQuestion, value: any) => {
-    setQuestionData(prev => ({
-      ...prev,
-      [field]: value
-    }));
+    setQuestionData(prev => {
+      const updated = { ...prev, [field]: value };
+      
+      // Auto-set appropriate wordLimit when changing subType
+      if (field === 'subType') {
+        const isCompType = [
+          'form-completion',
+          'note-completion',
+          'table-completion',
+          'flowchart-completion',
+          'sentence-completion',
+          'summary-completion'
+        ].includes(value);
+        
+        const isShortAnswer = value === 'listening-short-answer';
+        
+        if (isCompType || isShortAnswer) {
+          // Set default wordLimit for listening completion/short-answer (1-5)
+          updated.wordLimit = prev.wordLimit && prev.wordLimit >= 1 && prev.wordLimit <= 5 ? prev.wordLimit : 2;
+        } else if (value === 'task1' || value === 'task2' || value === 'essay') {
+          // Set default wordLimit for writing tasks (50+)
+          updated.wordLimit = prev.wordLimit && prev.wordLimit >= 50 ? prev.wordLimit : 150;
+        }
+      }
+      
+      return updated;
+    });
   };
 
   const handleOptionChange = (index: number, value: string) => {
@@ -524,6 +547,12 @@ export default function CreateQuestionPage() {
         if (questionData.blanksCount && questionData.blanksCount > 0) {
           questionDataToSend.blanksCount = questionData.blanksCount;
         }
+      }
+
+      
+      if (needsWordLimit() && questionData.wordLimit && questionData.wordLimit > 0) {
+        questionDataToSend.wordLimit = questionData.wordLimit;
+        questionDataToSend.blanksCount = questionData.wordLimit;
       }
 
       // Add options for multiple choice questions
@@ -1223,9 +1252,15 @@ export default function CreateQuestionPage() {
                     value={questionData.wordLimit}
                     onChange={(e) => handleInputChange('wordLimit', parseInt(e.target.value) || 1)}
                   />
-                  <p className="text-xs text-muted-foreground">
-                    Maximum number of words for answers (1-5)
-                  </p>
+                  <div className="text-xs text-muted-foreground space-y-1">
+                    <p>Maximum number of words for answers (1-5)</p>
+                    <div className="pl-2 border-l-2 border-blue-200 space-y-0.5">
+                      <p>• 1 = ONE WORD ONLY</p>
+                      <p>• 2 = NO MORE THAN TWO WORDS</p>
+                      <p>• 3 = NO MORE THAN THREE WORDS</p>
+                      <p>• 4 = NO MORE THAN FOUR WORDS</p>
+                    </div>
+                  </div>
                 </div>
               )}
             </CardContent>

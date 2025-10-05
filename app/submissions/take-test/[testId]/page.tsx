@@ -32,12 +32,10 @@ import {
   Volume2,
   PenTool,
   AlertTriangle,
-  Home,
-  ImageIcon
+  Home
 } from 'lucide-react';
 import { authService } from '@/lib/auth';
 import { AudioPlayer } from '@/components/ui/audio-player';
-import Image from 'next/image';
 
 interface Question {
   _id: string;
@@ -50,20 +48,20 @@ interface Question {
   audioUrl?: string;
   audioFile?: {
     url: string;
-    publicId: string;
-    originalName: string;
-    format: string;
-    bytes: number;
+    publicId?: string;
+    originalName?: string;
+    format?: string;
+    bytes?: number;
     duration?: number;
   };
   imageFile?: {
     url: string;
-    publicId: string;
-    originalName: string;
-    format: string;
-    bytes: number;
-    width: number;
-    height: number;
+    publicId?: string;
+    originalName?: string;
+    format?: string;
+    bytes?: number;
+    width?: number;
+    height?: number;
   };
   options?: string[];
   points: number;
@@ -76,10 +74,10 @@ interface Question {
   sectionName?: string;
   sectionInstructions?: string;
   paragraphRef?: string;
+  section?: number;
   instructionText?: string;
   wordLimit?: number;
   blanksCount?: number;
-  difficulty?: 'easy' | 'medium' | 'hard';
 }
 
 interface Passage {
@@ -134,107 +132,16 @@ export default function TakeTestPage() {
   const [submissionId, setSubmissionId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [submitting, setSubmitting] = useState(false);
   const [questionStartTime, setQuestionStartTime] = useState(Date.now());
 
   const assignmentId = searchParams.get('assignment');
   const existingSubmissionId = searchParams.get('submission');
 
-  const handleSubmitTest = useCallback(async () => {
-    if (!submissionId || submitting) return;
-
-    setSubmitting(true);
-    
-    try {
-      const response = await authService.apiRequest(`/submissions/submit/${submissionId}`, {
-        method: 'POST'
-      });
-
-      // Response structure: { message, score, totalPoints, percentage, isPassed }
-      console.log('Test submitted successfully:', response);
-      
-      // Store submission result temporarily for results page if needed
-      if (typeof window !== 'undefined') {
-        sessionStorage.setItem(`submission_result_${submissionId}`, JSON.stringify({
-          score: response.score,
-          totalPoints: response.totalPoints,
-          percentage: response.percentage,
-          isPassed: response.isPassed,
-          message: response.message,
-          submittedAt: new Date().toISOString()
-        }));
-      }
-      
-      // Navigate to results page with the submission response data
-      router.push(`/submissions/results/${submissionId}`);
-    } catch (error) {
-      console.error('Failed to submit test:', error);
-      setSubmitting(false);
-      // Show user-friendly error message
-      alert('Failed to submit test. Please try again or contact support.');
-      // For demo, navigate anyway (remove this in production)
-      router.push(`/submissions/results/${submissionId}`);
-    }
-  }, [submissionId, submitting, router]);
-
-  const initializeTest = useCallback(async (testId: string) => {
-    try {
-      if (!authService.isAuthenticated()) {
-        router.push('/login');
-        return;
-      }
-
-      // Fetch test data
-      let testData;
-      try {
-        testData = await authService.apiRequest(`/tests/${testId}`);
-      } catch (error) {
-        console.error('Failed to fetch test:', error);
-        setLoading(false);
-        return;
-      }
-
-      setTest(testData);
-      
-      // Process questions (simplified for now)
-      let allQuestions: Question[] = [];
-      
-      if (testData.questions && testData.questions.length > 0) {
-        for (const question of testData.questions) {
-          if (typeof question === 'string') {
-            try {
-              const questionData = await authService.apiRequest(`/questions/${question}`);
-              allQuestions.push({
-                ...questionData,
-                subType: questionData.subType || questionData.type
-              });
-            } catch (error) {
-              console.error(`Failed to fetch question ${question}:`, error);
-            }
-          } else {
-            allQuestions.push({
-              ...question,
-              subType: question.subType || question.type
-            });
-          }
-        }
-      }
-
-      setAllQuestions(allQuestions);
-      setTimeRemaining(testData.duration * 60);
-      setQuestionStartTime(Date.now());
-    } catch (error) {
-      console.error('Failed to initialize test:', error);
-    } finally {
-      setLoading(false);
-    }
-  }, [router]);
-
   useEffect(() => {
     if (params.testId) {
       initializeTest(params.testId as string);
     }
-  }, [params.testId, initializeTest]);
+  }, [params.testId]);
 
   // Timer effect
   useEffect(() => {
@@ -254,7 +161,192 @@ export default function TakeTestPage() {
 
       return () => clearInterval(timer);
     }
-  }, [timeRemaining, submissionId, handleSubmitTest]);
+  }, [timeRemaining, submissionId]);
+
+  const initializeTest = async (testId: string) => {
+    try {
+      if (!authService.isAuthenticated()) {
+        router.push('/login');
+        return;
+      }
+
+      // Fetch test data
+      let testData;
+      try {
+        testData = await authService.apiRequest(`/tests/${testId}`);
+      } catch (error) {
+        console.error('Failed to fetch test:', error);
+        // Don't redirect immediately, show error state
+        setLoading(false);
+        return;
+      }
+
+      setTest(testData);
+
+      // Process passages and fetch questions
+      let allQuestions: Question[] = [];
+
+      // Add standalone questions
+      if (testData.questions && testData.questions.length > 0) {
+        // Process standalone questions (if they exist)
+        for (const question of testData.questions) {
+          if (typeof question === 'string') {
+            // If it's just an ID, fetch the question
+            try {
+              const questionData = await authService.apiRequest(`/questions/${question}`);
+              allQuestions.push({
+                ...questionData,
+                subType: questionData.subType || questionData.type
+              });
+            } catch (error) {
+              console.error(`Failed to fetch question ${question}:`, error);
+            }
+          } else {
+            // If it's already a question object
+            allQuestions.push({
+              ...question,
+              subType: question.subType || question.type
+            });
+          }
+        }
+      }
+
+      // Process passages and their questions
+      if (testData.passages && testData.passages.length > 0) {
+        for (const passage of testData.passages) {
+          // New model: questionSections with question ID arrays
+          if (passage.questionSections && passage.questionSections?.length > 0) {
+            for (const section of passage.questionSections) {
+              if (section.questions && section.questions.length > 0) {
+                for (const questionId of section.questions) {
+                  try {
+                    const questionData = await authService.apiRequest(`/questions/${questionId}`);
+                    const questionWithContext: Question = {
+                      ...questionData,
+                      _id: questionData._id || `${passage._id}-${section._id}-${questionData.number}`,
+                      type: passage.type as 'reading' | 'listening' | 'writing',
+                      subType: questionData.subType || questionData.type,
+                      question: questionData.question || questionData.prompt || '',
+                      number: questionData.questionNumber || questionData.number,
+                      options: questionData.options || [],
+                      points: questionData.points || 1,
+                      passageId: passage._id,
+                      passageTitle: passage.title,
+                      passageContent: passage.content,
+                      passageAudioUrl: passage.audioUrl,
+                      sectionName: section.title,
+                      sectionInstructions: section.instructions,
+                      paragraphRef: questionData.paragraphRef
+                    };
+                    allQuestions.push(questionWithContext);
+                  } catch (error) {
+                    console.error(`Failed to fetch question ${questionId}:`, error);
+                  }
+                }
+              }
+            }
+          }
+          // Legacy: sections with embedded questions
+          else if (passage.sections && passage.sections?.length > 0) {
+            for (const section of passage.sections) {
+              if (section.questions && section.questions.length > 0) {
+                for (const question of section.questions) {
+                  const questionWithContext: Question = {
+                    ...question,
+                    _id: question._id || `${passage._id}-${section._id}-${question.number}`,
+                    type: passage.type as 'reading' | 'listening' | 'writing',
+                    subType: question.type,
+                    question: question.prompt || question.question || '',
+                    points: question.points || 1,
+                    passageId: passage._id,
+                    passageTitle: passage.title,
+                    passageContent: passage.content,
+                    passageAudioUrl: passage.audioUrl,
+                    sectionName: section.name,
+                    sectionInstructions: section.instructions,
+                    paragraphRef: question.paragraphRef
+                  };
+                  allQuestions.push(questionWithContext);
+                }
+              }
+            }
+          }
+          // Process legacy questions array (if exists)
+          else if (passage.questions && passage.questions.length > 0) {
+            for (const questionId of passage.questions) {
+              try {
+                const questionData = await authService.apiRequest(`/questions/${questionId}`);
+                const questionWithPassage: Question = {
+                  ...questionData,
+                  subType: questionData.subType || questionData.type,
+                  passageId: passage._id,
+                  passageTitle: passage.title,
+                  passageContent: passage.content,
+                  passageAudioUrl: passage.audioUrl,
+                };
+                allQuestions.push(questionWithPassage);
+              } catch (error) {
+                console.error(`Failed to fetch question ${questionId}:`, error);
+              }
+            }
+          }
+        }
+      }
+
+      setAllQuestions(allQuestions);
+
+      // Set current passage for first question
+      if (allQuestions.length > 0 && allQuestions[0].passageId) {
+        const firstPassage = testData.passages?.find((p: Passage) => p._id === allQuestions[0].passageId);
+        setCurrentPassage(firstPassage || null);
+      }
+      // Start or continue submission
+      if (existingSubmissionId) {
+        setSubmissionId(existingSubmissionId);
+        // Set timer based on remaining time if available
+        setTimeRemaining(testData.duration * 60);
+
+        // Load existing answers
+        try {
+          const submissionData = await authService.getSubmissionResults(existingSubmissionId);
+          if (submissionData.answers) {
+            setAnswers(submissionData.answers);
+          }
+          // If submission has remaining time, use that instead
+          if (submissionData.remainingTime) {
+            setTimeRemaining(submissionData.remainingTime);
+          }
+        } catch (error) {
+          console.error('Failed to load existing answers:', error);
+          // Continue with fresh timer if can't load existing submission
+          setTimeRemaining(testData.duration * 60);
+        }
+      } else if (assignmentId) {
+        // Start new submission
+        try {
+          const response = await startSubmission(testId, assignmentId);
+          setSubmissionId(response.submissionId);
+          setTimeRemaining(testData.duration * 60);
+        } catch (error) {
+          console.error('Failed to start submission:', error);
+          // Show error but don't redirect
+          setLoading(false);
+          return;
+        }
+      } else {
+        // No assignment or submission ID - this shouldn't happen
+        console.error('No assignment or submission ID provided');
+        setTimeRemaining(testData.duration * 60);
+      }
+
+      setQuestionStartTime(Date.now());
+    } catch (error) {
+      console.error('Failed to initialize test:', error);
+      // Don't redirect immediately, let user see what happened
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const startSubmission = async (testId: string, assignmentId: string) => {
     try {
@@ -345,6 +437,22 @@ export default function TakeTestPage() {
       setCurrentPassage(passage || null);
     } else {
       setCurrentPassage(null);
+    }
+  };
+
+  const handleSubmitTest = async () => {
+    if (!submissionId) return;
+
+    try {
+      await authService.apiRequest(`/submissions/submit/${submissionId}`, {
+        method: 'POST'
+      });
+
+      router.push(`/submissions/results/${submissionId}`);
+    } catch (error) {
+      console.error('Failed to submit test:', error);
+      // For demo, navigate anyway
+      router.push(`/submissions/results/${submissionId}`);
     }
   };
 
@@ -446,11 +554,9 @@ export default function TakeTestPage() {
           <div className="flex items-center justify-between h-16">
             <div className="flex items-center gap-3">
               <div className="flex h-12 w-12 items-center justify-center rounded-full bg-white shadow-md overflow-hidden flex-shrink-0">
-                <Image 
-                  src="/BHV-logo-page.jpg" 
-                  alt="BHV English Logo" 
-                  width={48}
-                  height={48}
+                <img
+                  src="/BHV-logo-page.jpg"
+                  alt="BHV English Logo"
                   className="h-full w-full object-cover"
                   onError={(e) => {
                     const target = e.currentTarget as HTMLImageElement;
@@ -460,12 +566,11 @@ export default function TakeTestPage() {
               </div>
               <div className="border-l border-slate-300 pl-3 hidden sm:block">
                 <div className="flex items-center gap-2">
-                  <div className={`flex h-6 w-6 items-center justify-center rounded-lg ${
-                    test.type === 'reading' ? 'bg-blue-100 text-blue-600' :
-                    test.type === 'listening' ? 'bg-purple-100 text-purple-600' :
-                    test.type === 'writing' ? 'bg-green-100 text-green-600' :
-                    'bg-slate-100 text-slate-600'
-                  }`}>
+                  <div className={`flex h-6 w-6 items-center justify-center rounded-lg ${test.type === 'reading' ? 'bg-blue-100 text-blue-600' :
+                      test.type === 'listening' ? 'bg-purple-100 text-purple-600' :
+                        test.type === 'writing' ? 'bg-green-100 text-green-600' :
+                          'bg-slate-100 text-slate-600'
+                    }`}>
                     {getTypeIcon(test.type)}
                   </div>
                   <div>
@@ -477,27 +582,24 @@ export default function TakeTestPage() {
             </div>
 
             <div className="flex items-center gap-2 sm:gap-3">
-              <Button 
-                variant="ghost" 
-                size="sm" 
-                onClick={() => router.push('/submissions')} 
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => router.push('/submissions')}
                 className="gap-2 hover:bg-slate-100 text-slate-700"
               >
                 <Home className="h-4 w-4" />
                 <span className="hidden sm:inline">Back</span>
               </Button>
-              <div className={`flex items-center gap-2 px-3 py-2 rounded-lg transition-colors ${
-                timeRemaining < 300 
-                  ? 'border-2 border-red-300' 
+              <div className={`flex items-center gap-2 px-3 py-2 rounded-lg transition-colors ${timeRemaining < 300
+                  ? 'border-2 border-red-300'
                   : ''
-              }`}>
-                <Clock className={`h-4 w-4 sm:h-5 sm:w-5 ${
-                  timeRemaining < 300 ? 'text-red-600 animate-pulse' : 'text-[#004875]'
-                }`} />
+                }`}>
+                <Clock className={`h-4 w-4 sm:h-5 sm:w-5 ${timeRemaining < 300 ? 'text-red-600 animate-pulse' : 'text-[#004875]'
+                  }`} />
                 <div className="text-right">
-                  <div className={`font-mono text-base sm:text-lg font-bold leading-tight ${
-                    timeRemaining < 300 ? 'text-red-600' : 'text-[#004875]'
-                  }`}>
+                  <div className={`font-mono text-base sm:text-lg font-bold leading-tight ${timeRemaining < 300 ? 'text-red-600' : 'text-[#004875]'
+                    }`}>
                     {formatTime(timeRemaining)}
                   </div>
                   {timeRemaining < 300 && (
@@ -534,18 +636,17 @@ export default function TakeTestPage() {
           </CardContent>
         </Card>
 
-        <div className="grid gap-6 lg:grid-cols-4">
+        <div className="grid gap-6 lg:grid-cols-4 lg:h-[calc(100vh-12rem)]">
           {/* Question Content - Scrollable Area */}
-          <div className="lg:col-span-3 space-y-6">
+          <div className="lg:col-span-3 lg:overflow-y-auto lg:pr-2 space-y-6 lg:h-full lg:scrollbar-thin">
             {/* Passage Card */}
             {currentPassage && (
               <Card className="mb-6 border-slate-200 shadow-sm">
                 <CardHeader className="border-b border-slate-100 bg-slate-50/50">
                   <CardTitle className="flex items-center gap-3">
-                    <div className={`h-8 w-8 rounded-lg flex items-center justify-center ${
-                      currentPassage.type === 'reading' ? 'bg-blue-100' :
-                      currentPassage.type === 'listening' ? 'bg-purple-100' : 'bg-slate-100'
-                    }`}>
+                    <div className={`h-8 w-8 rounded-lg flex items-center justify-center ${currentPassage.type === 'reading' ? 'bg-blue-100' :
+                        currentPassage.type === 'listening' ? 'bg-purple-100' : 'bg-slate-100'
+                      }`}>
                       {getTypeIcon(currentPassage.type)}
                     </div>
                     <span className="text-slate-900">{currentPassage.title}</span>
@@ -555,23 +656,17 @@ export default function TakeTestPage() {
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="pt-6">
-                  <div className="max-h-80 overflow-y-auto pr-4">
+                  <ScrollArea className="max-h-80 pr-4">
                     <div className="space-y-4">
                       {/* Audio for listening passages */}
                       {currentPassage.audioUrl && (
                         <div className="space-y-2">
-                          <Label className="text-sm font-medium flex items-center gap-2">
-                            <Volume2 className="h-4 w-4" />
-                            Passage Audio
-                          </Label>
-                          <AudioPlayer 
-                            src={currentPassage.audioUrl}
-                            title={currentPassage.title || 'Passage Audio'}
-                            showDownload={false}
-                            className="border-2 border-green-200"
-                          />
-                          <div className="text-xs text-muted-foreground p-2 bg-green-50 rounded">
-                            🎧 Listen to the passage carefully before answering the questions.
+                          <Label className="text-sm font-medium">Audio</Label>
+                          <div className="p-4 bg-muted rounded-lg">
+                            <audio controls className="w-full">
+                              <source src={currentPassage.audioUrl} type="audio/mpeg" />
+                              Your browser does not support the audio element.
+                            </audio>
                           </div>
                         </div>
                       )}
@@ -584,7 +679,7 @@ export default function TakeTestPage() {
                         </p>
                       </div>
                     </div>
-                  </div>
+                  </ScrollArea>
                 </CardContent>
               </Card>
             )}
@@ -594,16 +689,6 @@ export default function TakeTestPage() {
               <CardHeader className="border-b border-slate-100 bg-slate-50/50">
                 <div className="flex items-center justify-between flex-wrap gap-3">
                   <CardTitle className="flex items-center gap-2 text-slate-900">
-                    {currentQuestion?.difficulty && (
-                      <Badge variant="outline" className={`font-semibold ${
-                        currentQuestion.difficulty === 'easy' ? 'bg-green-100 text-green-800 border-green-200' :
-                        currentQuestion.difficulty === 'medium' ? 'bg-yellow-100 text-yellow-800 border-yellow-200' :
-                        currentQuestion.difficulty === 'hard' ? 'bg-red-100 text-red-800 border-red-200' :
-                        'bg-gray-100 text-gray-800 border-gray-200'
-                      }`}>
-                        {currentQuestion.difficulty}
-                      </Badge>
-                    )}
                     <Badge variant="outline" className="border-[#004875] text-[#004875] font-semibold px-3">
                       Q{currentQuestion?.number || (currentQuestionIndex + 1)}
                     </Badge>
@@ -634,42 +719,49 @@ export default function TakeTestPage() {
                   </CardDescription>
                 )}
               </CardHeader>
-              <CardContent className="pt-6">
-                <div className="space-y-6">
+              <CardContent>
+                <ScrollArea className="max-h-[70vh] pr-4">
+                  <div className="space-y-6">
 
                     {/* Question */}
                     <div className="space-y-4">
-                      
-                      {/* Detailed Instructions for Writing */}
-                      {currentQuestion?.instructionText && (
-                        <div className="space-y-2">
-                          <Label className="text-sm font-medium">Instructions</Label>
-                          <div className="p-4 bg-blue-50 rounded-lg border border-blue-200">
-                            <p className="text-sm leading-relaxed whitespace-pre-wrap">
-                              {currentQuestion.instructionText}
-                            </p>
+                      {/* Audio Player for Listening Questions */}
+                      {currentQuestion?.type === 'listening' && currentQuestion?.audioFile?.url && (
+                        <div className="mb-6">
+                          <div className="flex items-center gap-2 mb-3">
+                            <Volume2 className="h-5 w-5 text-purple-600" />
+                            <Label className="text-sm font-semibold text-slate-700">
+                              Listen to the audio
+                            </Label>
+                            {currentQuestion?.section && (
+                              <Badge variant="outline" className="ml-2 border-purple-300 text-purple-700">
+                                Section {currentQuestion.section}
+                              </Badge>
+                            )}
                           </div>
+                          <AudioPlayer
+                            src={currentQuestion.audioFile.url}
+                            title={currentQuestion.audioFile.originalName || `Question ${currentQuestionIndex + 1} Audio`}
+                            showDownload={false}
+                            className="w-full"
+                          />
                         </div>
                       )}
 
-                      {/* Image for Reading/Writing Task 1 */}
-                      {currentQuestion?.imageFile && (
-                        <div className="space-y-2">
-                          <Label className="text-sm font-medium flex items-center gap-2">
-                            <ImageIcon className="h-4 w-4" />
-                            {currentQuestion.type === 'writing' ? 'Chart/Graph to Analyze' : 'Reference Image'}
-                          </Label>
-                          <div className="border rounded-lg overflow-hidden bg-white">
-                            <Image
+                      {/* Image for Questions with imageFile */}
+                      {currentQuestion?.imageFile?.url && (
+                        <div className="mb-6">
+                          <div className="flex items-center gap-2 mb-3">
+                            <Label className="text-sm font-semibold text-slate-700">
+                              Reference Image
+                            </Label>
+                          </div>
+                          <div className="rounded-lg border border-slate-200 overflow-hidden bg-slate-50">
+                            <img
                               src={currentQuestion.imageFile.url}
-                              alt={currentQuestion.imageFile.originalName}
-                              width={currentQuestion.imageFile.width}
-                              height={currentQuestion.imageFile.height}
+                              alt={currentQuestion.imageFile.originalName || 'Question image'}
                               className="w-full h-auto max-h-96 object-contain"
                             />
-                            <div className="p-2 text-xs text-muted-foreground bg-gray-50">
-                              {currentQuestion.imageFile.originalName} • {currentQuestion.imageFile.width}×{currentQuestion.imageFile.height} • {Math.round(currentQuestion.imageFile.bytes / 1024)}KB
-                            </div>
                           </div>
                         </div>
                       )}
@@ -678,53 +770,17 @@ export default function TakeTestPage() {
                         <Label className="text-base font-semibold text-slate-900 leading-relaxed">
                           {currentQuestion?.question || currentQuestion?.prompt}
                         </Label>
+                        {currentQuestion?.instructionText && (
+                          <p className="text-sm text-slate-600 mt-2 italic">
+                            {currentQuestion.instructionText}
+                          </p>
+                        )}
+                        {currentQuestion?.wordLimit && (
+                          <Badge variant="outline" className="mt-2 border-blue-300 text-blue-700">
+                            Word limit: {currentQuestion.wordLimit} words
+                          </Badge>
+                        )}
                       </div>
-
-                      {/* Writing Word Limit */}
-                      {currentQuestion?.type === 'writing' && currentQuestion?.wordLimit && (
-                        <div className="p-3 bg-amber-50 rounded-lg border border-amber-200">
-                          <div className="flex items-center gap-2 text-amber-800">
-                            <PenTool className="h-4 w-4" />
-                            <span className="font-medium">Word Limit: {currentQuestion.wordLimit} words</span>
-                          </div>
-                        </div>
-                      )}
-
-                      {/* Audio Player for Individual Question */}
-                      {(currentQuestion?.audioFile || currentQuestion?.audioUrl) && currentQuestion?.type === 'listening' && (
-                        <div className="space-y-2">
-                          <Label className="text-sm font-medium flex items-center gap-2">
-                            <Volume2 className="h-4 w-4" />
-                            Question Audio
-                          </Label>
-                          {currentQuestion.audioFile ? (
-                            <div className="p-4 bg-blue-50 rounded-lg border border-blue-200">
-                              <audio controls className="w-full mb-2">
-                                <source src={currentQuestion.audioFile.url} type="audio/mpeg" />
-                                Your browser does not support the audio element.
-                              </audio>
-                              <div className="text-xs text-muted-foreground">
-                                {currentQuestion.audioFile.originalName} • {currentQuestion.audioFile.duration ? `${Math.round(currentQuestion.audioFile.duration)}s` : ''} • {Math.round(currentQuestion.audioFile.bytes / 1024)}KB
-                              </div>
-                              <div className="text-xs text-muted-foreground mt-2">
-                                💡 You can replay the audio multiple times. Listen carefully before answering.
-                              </div>
-                            </div>
-                          ) : (
-                            <>
-                              <AudioPlayer 
-                                src={currentQuestion.audioUrl!}
-                                title={`Question ${currentQuestion.number || (currentQuestionIndex + 1)} Audio`}
-                                showDownload={false}
-                                className="border-2 border-blue-200"
-                              />
-                              <div className="text-xs text-muted-foreground p-2 bg-blue-50 rounded">
-                                🎧 Listen to this specific question audio before answering.
-                              </div>
-                            </>
-                          )}
-                        </div>
-                      )}
 
                       {currentQuestion?.paragraphRef && (
                         <div className="flex items-start gap-2 p-3 bg-blue-50 rounded-lg border border-blue-200">
@@ -738,7 +794,7 @@ export default function TakeTestPage() {
                       )}
 
                       {/* True/False/Not Given & Yes/No/Not Given */}
-                      {(currentQuestion?.subType === 'true-false-not-given' || currentQuestion?.subType === 'yes-no-not-given' || currentQuestion?.subType === 'true-false') && (
+                      {(currentQuestion?.subType === 'true-false-not-given' || currentQuestion?.subType === 'yes-no-not-given') && (
                         <RadioGroup
                           value={answers[currentAnswerKey] || ''}
                           onValueChange={(value) => handleSelectAnswer(currentQuestion, currentQuestionIndex, value)}
@@ -778,10 +834,8 @@ export default function TakeTestPage() {
                         </RadioGroup>
                       )}
 
-                      {/* Multiple Choice */}
-                      {(currentQuestion?.subType === 'multiple-choice' || 
-                        currentQuestion?.subType === 'listening-multiple-choice' ||
-                        currentQuestion?.subType === 'reading-multiple-choice') && currentQuestion?.options && (
+                      {/* Multiple Choice (Reading and Listening) */}
+                      {(currentQuestion?.subType === 'multiple-choice' || currentQuestion?.subType === 'listening-multiple-choice') && currentQuestion?.options && (
                         <RadioGroup
                           value={answers[currentAnswerKey] || ''}
                           onValueChange={(value) => handleSelectAnswer(currentQuestion, currentQuestionIndex, value)}
@@ -799,7 +853,7 @@ export default function TakeTestPage() {
                       )}
 
                       {/* Matching Information */}
-                      {(currentQuestion?.subType === 'matching-information' || currentQuestion?.subType === 'matching' || currentQuestion?.subType === 'listening-matching') && (
+                      {currentQuestion?.subType === 'matching-information' && (
                         <div className="space-y-2">
                           <Label className="text-sm">Select the correct paragraph:</Label>
                           <RadioGroup
@@ -811,27 +865,6 @@ export default function TakeTestPage() {
                                 <RadioGroupItem value={letter} id={`para-${currentQuestionIndex}-${letter}`} />
                                 <Label htmlFor={`para-${currentQuestionIndex}-${letter}`} className="cursor-pointer">
                                   Paragraph {letter}
-                                </Label>
-                              </div>
-                            ))}
-                          </RadioGroup>
-                        </div>
-                      )}
-
-                      {/* Pick from List */}
-                      {currentQuestion?.subType === 'pick-from-list' && currentQuestion?.options && (
-                        <div className="space-y-2">
-                          <Label className="text-sm">Select from the list below:</Label>
-                          <RadioGroup
-                            value={answers[currentAnswerKey] || ''}
-                            onValueChange={(value) => handleSelectAnswer(currentQuestion, currentQuestionIndex, value)}
-                            className="space-y-2"
-                          >
-                            {currentQuestion.options.map((option, index) => (
-                              <div key={index} className="flex items-center space-x-3 py-2">
-                                <RadioGroupItem value={option} id={`list-${currentQuestionIndex}-${index}`} />
-                                <Label htmlFor={`list-${currentQuestionIndex}-${index}`} className="cursor-pointer font-medium flex-1">
-                                  {option}
                                 </Label>
                               </div>
                             ))}
@@ -867,110 +900,56 @@ export default function TakeTestPage() {
                         </>
                       )}
 
-                      {/* Fill in the Blank with Multiple Blanks */}
-                      {currentQuestion?.subType === 'fill-blank' && currentQuestion?.blanksCount && currentQuestion.blanksCount > 1 ? (
-                        <div className="space-y-3">
-                          {Array.from({ length: currentQuestion.blanksCount }).map((_, index) => (
-                            <div key={index} className="space-y-1">
-                              <Label htmlFor={`blank-${index}`} className="text-sm">
-                                Blank {index + 1}
-                              </Label>
-                              <Input
-                                id={`blank-${index}`}
-                                placeholder={`Enter answer for blank ${index + 1}...`}
-                                value={(() => {
-                                  try {
-                                    const parsedAnswers = JSON.parse(answers[currentAnswerKey] || '[]');
-                                    return parsedAnswers[index] || '';
-                                  } catch {
-                                    return '';
-                                  }
-                                })()}
-                                onChange={(e) => {
-                                  try {
-                                    const parsedAnswers = JSON.parse(answers[currentAnswerKey] || '[]');
-                                    while (parsedAnswers.length <= index) parsedAnswers.push('');
-                                    parsedAnswers[index] = e.target.value;
-                                    handleLocalInputChange(currentQuestion, currentQuestionIndex, JSON.stringify(parsedAnswers));
-                                  } catch {
-                                    const newAnswers = Array(currentQuestion.blanksCount || 1).fill('');
-                                    newAnswers[index] = e.target.value;
-                                    handleLocalInputChange(currentQuestion, currentQuestionIndex, JSON.stringify(newAnswers));
-                                  }
-                                }}
-                                onBlur={() => handleLocalInputCommit(currentQuestion, currentQuestionIndex)}
-                                className="border-slate-300 focus:border-[#004875] focus:ring-[#004875] text-base py-3"
-                              />
-                            </div>
-                          ))}
-                        </div>
-                      ) : (
-                        /* All completion and short answer types */
-                        (currentQuestion?.subType === 'sentence-completion' ||
-                         currentQuestion?.subType === 'summary-completion' ||
-                         currentQuestion?.subType === 'short-answer' ||
-                         currentQuestion?.subType === 'listening-short-answer' ||
-                         currentQuestion?.subType === 'fill-blank' ||
-                         currentQuestion?.subType === 'form-completion' ||
-                         currentQuestion?.subType === 'note-completion' ||
-                         currentQuestion?.subType === 'table-completion' ||
-                         currentQuestion?.subType === 'flowchart-completion' ||
-                         currentQuestion?.subType === 'diagram-labelling' ||
-                         currentQuestion?.subType === 'map-labelling' ||
-                         currentQuestion?.subType === 'plan-labelling') && (
+                      {/* Sentence Completion / Summary Completion / Short Answer / Listening Completion Types */}
+                      {(currentQuestion?.subType === 'sentence-completion' ||
+                        currentQuestion?.subType === 'summary-completion' ||
+                        currentQuestion?.subType === 'short-answer' ||
+                        currentQuestion?.subType === 'fill-blank' ||
+                        currentQuestion?.subType === 'diagram-completion' ||
+                        currentQuestion?.subType === 'form-completion' ||
+                        currentQuestion?.subType === 'note-completion' ||
+                        currentQuestion?.subType === 'table-completion' ||
+                        currentQuestion?.subType === 'flowchart-completion' ||
+                        currentQuestion?.subType === 'diagram-labelling' ||
+                        currentQuestion?.subType === 'map-labelling' ||
+                        currentQuestion?.subType === 'plan-labelling' ||
+                        currentQuestion?.subType === 'listening-short-answer' ||
+                        currentQuestion?.subType === 'listening-matching' ||
+                        currentQuestion?.subType === 'pick-from-list') && (
                           <Input
-                            placeholder={
-                              currentQuestion?.subType === 'form-completion' ? "Complete the form field..." :
-                              currentQuestion?.subType === 'note-completion' ? "Complete the note..." :
-                              currentQuestion?.subType === 'table-completion' ? "Complete the table cell..." :
-                              currentQuestion?.subType === 'flowchart-completion' ? "Complete the flowchart..." :
-                              currentQuestion?.subType === 'sentence-completion' ? "Complete the sentence..." :
-                              currentQuestion?.subType === 'summary-completion' ? "Complete the summary..." :
-                              currentQuestion?.subType === 'diagram-labelling' ? "Label the diagram..." :
-                              currentQuestion?.subType === 'map-labelling' ? "Label the map..." :
-                              currentQuestion?.subType === 'plan-labelling' ? "Label the plan..." :
-                              currentQuestion?.subType === 'listening-short-answer' ? "Listen and answer..." :
-                              currentQuestion?.wordLimit ? `Type your answer (max ${currentQuestion.wordLimit} words)...` :
-                              "Type your answer here..."
-                            }
+                            placeholder="Type your answer here..."
                             value={answers[currentAnswerKey] || ''}
                             onChange={(e) => handleLocalInputChange(currentQuestion, currentQuestionIndex, e.target.value)}
                             onBlur={() => handleLocalInputCommit(currentQuestion, currentQuestionIndex)}
                             className="border-slate-300 focus:border-[#004875] focus:ring-[#004875] text-base py-5"
                           />
-                        )
-                      )}
+                        )}
 
-                      {/* Writing tasks with enhanced features */}
+                      {/* Writing tasks */}
                       {(currentQuestion?.subType === 'task1' || currentQuestion?.subType === 'task2' || currentQuestion?.subType === 'essay') && (
-                        <div className="space-y-2">
+                        <div className="space-y-3">
+                          {currentQuestion?.wordLimit && (
+                            <div className="flex items-center justify-between text-sm">
+                              <span className="text-slate-600">Word limit: {currentQuestion.wordLimit} words</span>
+                              <span className="text-slate-500">
+                                Current: {(answers[currentAnswerKey] || '').split(/\s+/).filter(Boolean).length} words
+                              </span>
+                            </div>
+                          )}
                           <Textarea
-                            placeholder={
-                              currentQuestion.subType === 'task1' 
-                                ? "Describe the chart/graph/diagram in detail. Identify key trends, comparisons, and notable features..."
-                                : currentQuestion.subType === 'task2'
-                                ? "Present your argument with clear introduction, body paragraphs with examples, and conclusion..."
-                                : "Write your essay here..."
-                            }
+                            placeholder="Write your response here..."
                             rows={12}
                             value={answers[currentAnswerKey] || ''}
                             onChange={(e) => handleSelectAnswer(currentQuestion, currentQuestionIndex, e.target.value)}
                             className="border-slate-300 focus:border-[#004875] focus:ring-[#004875] text-base leading-relaxed resize-none"
                           />
-                          <div className="flex justify-between text-xs text-slate-500">
-                            <span>Word count: {answers[currentAnswerKey] ? answers[currentAnswerKey].split(/\s+/).filter(word => word.length > 0).length : 0} words</span>
-                            {currentQuestion.wordLimit && (
-                              <span className={answers[currentAnswerKey] && answers[currentAnswerKey].split(/\s+/).filter(word => word.length > 0).length > currentQuestion.wordLimit ? 'text-red-600 font-medium' : 'text-slate-500'}>
-                                Target: {currentQuestion.wordLimit} words
-                              </span>
-                            )}
-                          </div>
                         </div>
                       )}
                     </div>
-                </div>
+                  </div>
+                </ScrollArea>
               </CardContent>
-              
+
               {/* Navigation - Moved here for better UX */}
               <CardContent className="border-t border-slate-100 bg-slate-50/30 py-4">
                 <div className="flex items-center gap-3">
@@ -998,31 +977,30 @@ export default function TakeTestPage() {
           </div>
 
           {/* Question Overview Sidebar - Fixed Position on Desktop */}
-          <div className="lg:col-span-1 flex flex-col gap-4">
+          <div className="lg:col-span-1 lg:h-full lg:overflow-hidden flex flex-col gap-4">
             {/* Questions Grid */}
             <Card className="border-slate-200 shadow-sm">
               <CardHeader className="border-b border-slate-100 bg-slate-50/50 py-3">
                 <CardTitle className="text-slate-900 text-base">Questions</CardTitle>
               </CardHeader>
               <CardContent className="pt-4 pb-4">
-                <div className="max-h-[40vh] lg:max-h-[60vh] overflow-y-auto">
+                <div className="max-h-[50vh] lg:max-h-none overflow-y-auto scrollbar-thin">
                   <div className="grid grid-cols-5 gap-1.5">
                     {allQuestions?.map((question, index) => {
                       const isAnswered = !!answers[getAnswerKey(question, index)];
                       const isCurrent = currentQuestionIndex === index;
-                      
+
                       return (
                         <Button
                           key={index}
                           variant={isCurrent ? "default" : "outline"}
                           size="sm"
-                          className={`h-8 w-8 p-0 text-xs font-semibold transition-all ${
-                            isCurrent 
+                          className={`h-8 w-8 p-0 text-xs font-semibold transition-all ${isCurrent
                               ? 'bg-[#004875] hover:bg-[#003a5c] text-white border-[#004875] shadow-md'
                               : isAnswered
-                              ? 'bg-green-50 border-green-400 text-green-700 hover:bg-green-100'
-                              : 'border-slate-300 hover:bg-slate-100 hover:border-slate-400'
-                          }`}
+                                ? 'bg-green-50 border-green-400 text-green-700 hover:bg-green-100'
+                                : 'border-slate-300 hover:bg-slate-100 hover:border-slate-400'
+                            }`}
                           onClick={() => {
                             setCurrentQuestionIndex(index);
                             updateCurrentPassage(index);
@@ -1057,12 +1035,11 @@ export default function TakeTestPage() {
               <CardContent className="p-4">
                 <AlertDialog>
                   <AlertDialogTrigger asChild>
-                    <Button 
+                    <Button
                       className="w-full bg-gradient-to-r from-[#004875] to-[#003a5c] hover:from-[#003a5c] hover:to-[#002a3c] text-white shadow-md font-semibold py-6 text-base"
-                      disabled={submitting}
                     >
                       <Send className="h-5 w-5 mr-2" />
-                      {submitting ? 'Submitting...' : 'Submit Test'}
+                      Submit Test
                     </Button>
                   </AlertDialogTrigger>
                   <AlertDialogContent className="border-slate-200">
@@ -1075,12 +1052,8 @@ export default function TakeTestPage() {
                     </AlertDialogHeader>
                     <AlertDialogFooter>
                       <AlertDialogCancel className="border-slate-300">Cancel</AlertDialogCancel>
-                      <AlertDialogAction 
-                        onClick={handleSubmitTest} 
-                        className="bg-[#004875] hover:bg-[#003a5c]"
-                        disabled={submitting}
-                      >
-                        {submitting ? 'Submitting...' : 'Submit Test'}
+                      <AlertDialogAction onClick={handleSubmitTest} className="bg-[#004875] hover:bg-[#003a5c]">
+                        Submit Test
                       </AlertDialogAction>
                     </AlertDialogFooter>
                   </AlertDialogContent>

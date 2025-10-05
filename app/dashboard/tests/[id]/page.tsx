@@ -41,9 +41,27 @@ import {
   Play,
   Clock,
   FileText,
-  Users
+  Users,
+  Plus,
+  Minus,
+  Search,
+  Check
 } from 'lucide-react';
 import { authService } from '@/lib/auth';
+import { Checkbox } from '@/components/ui/checkbox';
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from '@/components/ui/command';
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from '@/components/ui/popover';
 
 interface Test {
   _id: string;
@@ -78,6 +96,17 @@ export default function TestDetailPage() {
   const [isEditing, setIsEditing] = useState(false);
   const [saving, setSaving] = useState(false);
   const [editData, setEditData] = useState<Partial<Test>>({});
+  
+  // New state for managing passages and questions
+  const [availablePassages, setAvailablePassages] = useState<any[]>([]);
+  const [availableQuestions, setAvailableQuestions] = useState<any[]>([]);
+  const [selectedPassagesToAdd, setSelectedPassagesToAdd] = useState<string[]>([]);
+  const [selectedQuestionsToAdd, setSelectedQuestionsToAdd] = useState<string[]>([]);
+  const [selectedPassagesToRemove, setSelectedPassagesToRemove] = useState<string[]>([]);
+  const [selectedQuestionsToRemove, setSelectedQuestionsToRemove] = useState<string[]>([]);
+  const [isManagingContent, setIsManagingContent] = useState(false);
+  const [searchPassage, setSearchPassage] = useState('');
+  const [searchQuestion, setSearchQuestion] = useState('');
 
   useEffect(() => {
     if (params.id) {
@@ -97,6 +126,30 @@ export default function TestDetailPage() {
     }
   };
 
+  const fetchAvailablePassages = async () => {
+    try {
+      const data = await authService.apiRequest('/passages');
+      setAvailablePassages(data);
+    } catch (error) {
+      console.error('Failed to fetch passages:', error);
+    }
+  };
+
+  const fetchAvailableQuestions = async () => {
+    try {
+      const data = await authService.apiRequest('/questions');
+      setAvailableQuestions(data);
+    } catch (error) {
+      console.error('Failed to fetch questions:', error);
+    }
+  };
+
+  const handleManageContent = () => {
+    setIsManagingContent(true);
+    fetchAvailablePassages();
+    fetchAvailableQuestions();
+  };
+
   const handleSave = async () => {
     if (!test) return;
     
@@ -111,6 +164,53 @@ export default function TestDetailPage() {
       setIsEditing(false);
     } catch (error) {
       console.error('Failed to update test:', error);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleSaveContentChanges = async () => {
+    if (!test) return;
+    
+    setSaving(true);
+    try {
+      const updatePayload: any = {};
+      
+      // Add passages and questions to add
+      if (selectedPassagesToAdd.length > 0) {
+        updatePayload.addPassages = selectedPassagesToAdd;
+      }
+      if (selectedQuestionsToAdd.length > 0) {
+        updatePayload.addQuestions = selectedQuestionsToAdd;
+      }
+      
+      // Add passages and questions to remove
+      if (selectedPassagesToRemove.length > 0) {
+        updatePayload.removePassages = selectedPassagesToRemove;
+      }
+      if (selectedQuestionsToRemove.length > 0) {
+        updatePayload.removeQuestions = selectedQuestionsToRemove;
+      }
+
+      // Only send request if there are changes
+      if (Object.keys(updatePayload).length > 0) {
+        await authService.apiRequest(`/tests/${test._id}`, {
+          method: 'PUT',
+          body: JSON.stringify(updatePayload),
+        });
+
+        // Refresh test data
+        await fetchTest(test._id);
+      }
+      
+      // Reset selections and close modal
+      setSelectedPassagesToAdd([]);
+      setSelectedQuestionsToAdd([]);
+      setSelectedPassagesToRemove([]);
+      setSelectedQuestionsToRemove([]);
+      setIsManagingContent(false);
+    } catch (error) {
+      console.error('Failed to update test content:', error);
     } finally {
       setSaving(false);
     }
@@ -198,6 +298,10 @@ export default function TestDetailPage() {
             </>
           ) : (
             <>
+              <Button variant="outline" onClick={handleManageContent}>
+                <Plus className="mr-2 h-4 w-4" />
+                Manage Content
+              </Button>
               <Button variant="outline" onClick={() => setIsEditing(true)}>
                 <Edit2 className="mr-2 h-4 w-4" />
                 Edit
@@ -456,6 +560,316 @@ export default function TestDetailPage() {
           </Card>
         </div>
       </div>
+
+      {/* Content Management Dialog */}
+      <AlertDialog open={isManagingContent} onOpenChange={setIsManagingContent}>
+        <AlertDialogContent className="max-w-4xl max-h-[90vh] overflow-hidden flex flex-col">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Manage Test Content</AlertDialogTitle>
+            <AlertDialogDescription>
+              Add or remove passages and questions from this test. Changes are automatically checked for duplicates.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          
+          <Tabs defaultValue="add" className="flex-1 overflow-hidden flex flex-col">
+            <TabsList className="grid w-full grid-cols-2">
+              <TabsTrigger value="add">
+                <Plus className="mr-2 h-4 w-4" />
+                Add Content
+              </TabsTrigger>
+              <TabsTrigger value="remove">
+                <Minus className="mr-2 h-4 w-4" />
+                Remove Content
+              </TabsTrigger>
+            </TabsList>
+
+            {/* Add Content Tab */}
+            <TabsContent value="add" className="flex-1 overflow-hidden">
+              <ScrollArea className="h-[450px] pr-4">
+                <div className="space-y-6">
+                  {/* Add Passages */}
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between">
+                      <Label className="text-base font-semibold">Add Passages</Label>
+                      <Badge variant="secondary">
+                        {selectedPassagesToAdd.length} selected
+                      </Badge>
+                    </div>
+                    
+                    <div className="relative">
+                      <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                      <Input
+                        placeholder="Search passages..."
+                        value={searchPassage}
+                        onChange={(e) => setSearchPassage(e.target.value)}
+                        className="pl-9"
+                      />
+                    </div>
+
+                    <div className="space-y-2">
+                      {availablePassages
+                        .filter(p => !test?.passages?.some((tp: any) => tp._id === p._id))
+                        .filter(p => 
+                          searchPassage === '' || 
+                          p.title?.toLowerCase().includes(searchPassage.toLowerCase()) ||
+                          p.content?.toLowerCase().includes(searchPassage.toLowerCase())
+                        )
+                        .map((passage) => (
+                          <div
+                            key={passage._id}
+                            className="flex items-start space-x-3 p-3 rounded-lg border hover:bg-muted/50 cursor-pointer"
+                            onClick={() => {
+                              setSelectedPassagesToAdd(prev =>
+                                prev.includes(passage._id)
+                                  ? prev.filter(id => id !== passage._id)
+                                  : [...prev, passage._id]
+                              );
+                            }}
+                          >
+                            <Checkbox
+                              checked={selectedPassagesToAdd.includes(passage._id)}
+                              onCheckedChange={() => {}}
+                              className="mt-1"
+                            />
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-2 mb-1">
+                                <Badge variant="outline" className="text-xs">
+                                  {passage.type}
+                                </Badge>
+                                <Badge variant="secondary" className="text-xs">
+                                  {passage.questions?.length || 0} questions
+                                </Badge>
+                              </div>
+                              <p className="text-sm font-medium">{passage.title}</p>
+                              <p className="text-xs text-muted-foreground truncate">
+                                {passage.content?.substring(0, 100)}...
+                              </p>
+                            </div>
+                          </div>
+                        ))}
+                      {availablePassages.filter(p => !test?.passages?.some((tp: any) => tp._id === p._id)).length === 0 && (
+                        <div className="text-center py-8 text-muted-foreground">
+                          All passages are already added to this test
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Add Questions */}
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between">
+                      <Label className="text-base font-semibold">Add Questions</Label>
+                      <Badge variant="secondary">
+                        {selectedQuestionsToAdd.length} selected
+                      </Badge>
+                    </div>
+                    
+                    <div className="relative">
+                      <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                      <Input
+                        placeholder="Search questions..."
+                        value={searchQuestion}
+                        onChange={(e) => setSearchQuestion(e.target.value)}
+                        className="pl-9"
+                      />
+                    </div>
+
+                    <div className="space-y-2">
+                      {availableQuestions
+                        .filter(q => !test?.questions?.some((tq: any) => tq._id === q._id))
+                        .filter(q =>
+                          searchQuestion === '' ||
+                          q.question?.toLowerCase().includes(searchQuestion.toLowerCase()) ||
+                          q.type?.toLowerCase().includes(searchQuestion.toLowerCase())
+                        )
+                        .map((question) => (
+                          <div
+                            key={question._id}
+                            className="flex items-start space-x-3 p-3 rounded-lg border hover:bg-muted/50 cursor-pointer"
+                            onClick={() => {
+                              setSelectedQuestionsToAdd(prev =>
+                                prev.includes(question._id)
+                                  ? prev.filter(id => id !== question._id)
+                                  : [...prev, question._id]
+                              );
+                            }}
+                          >
+                            <Checkbox
+                              checked={selectedQuestionsToAdd.includes(question._id)}
+                              onCheckedChange={() => {}}
+                              className="mt-1"
+                            />
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-2 mb-1">
+                                <Badge variant="outline" className="text-xs">
+                                  {question.type}
+                                </Badge>
+                                <Badge variant="secondary" className="text-xs">
+                                  {question.points} pts
+                                </Badge>
+                                <Badge variant="outline" className="text-xs">
+                                  {question.difficulty}
+                                </Badge>
+                              </div>
+                              <p className="text-sm font-medium line-clamp-2">{question.question}</p>
+                              <p className="text-xs text-muted-foreground">
+                                {question.subType?.replace('-', ' ')}
+                              </p>
+                            </div>
+                          </div>
+                        ))}
+                      {availableQuestions.filter(q => !test?.questions?.some((tq: any) => tq._id === q._id)).length === 0 && (
+                        <div className="text-center py-8 text-muted-foreground">
+                          All questions are already added to this test
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </ScrollArea>
+            </TabsContent>
+
+            {/* Remove Content Tab */}
+            <TabsContent value="remove" className="flex-1 overflow-hidden">
+              <ScrollArea className="h-[450px] pr-4">
+                <div className="space-y-6">
+                  {/* Remove Passages */}
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between">
+                      <Label className="text-base font-semibold">Remove Passages</Label>
+                      <Badge variant="destructive">
+                        {selectedPassagesToRemove.length} selected
+                      </Badge>
+                    </div>
+
+                    <div className="space-y-2">
+                      {test?.passages && test.passages.length > 0 ? (
+                        test.passages.map((passage: any) => (
+                          <div
+                            key={passage._id}
+                            className="flex items-start space-x-3 p-3 rounded-lg border hover:bg-muted/50 cursor-pointer"
+                            onClick={() => {
+                              setSelectedPassagesToRemove(prev =>
+                                prev.includes(passage._id)
+                                  ? prev.filter(id => id !== passage._id)
+                                  : [...prev, passage._id]
+                              );
+                            }}
+                          >
+                            <Checkbox
+                              checked={selectedPassagesToRemove.includes(passage._id)}
+                              onCheckedChange={() => {}}
+                              className="mt-1"
+                            />
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-2 mb-1">
+                                <Badge variant="outline" className="text-xs">
+                                  {passage.type}
+                                </Badge>
+                                <Badge variant="secondary" className="text-xs">
+                                  {passage.questions?.length || 0} questions
+                                </Badge>
+                              </div>
+                              <p className="text-sm font-medium">{passage.title}</p>
+                              <p className="text-xs text-muted-foreground truncate">
+                                {passage.content?.substring(0, 100)}...
+                              </p>
+                            </div>
+                          </div>
+                        ))
+                      ) : (
+                        <div className="text-center py-8 text-muted-foreground">
+                          No passages in this test
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Remove Questions */}
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between">
+                      <Label className="text-base font-semibold">Remove Questions</Label>
+                      <Badge variant="destructive">
+                        {selectedQuestionsToRemove.length} selected
+                      </Badge>
+                    </div>
+
+                    <div className="space-y-2">
+                      {test?.questions && test.questions.length > 0 ? (
+                        test.questions.map((question: any) => (
+                          <div
+                            key={question._id}
+                            className="flex items-start space-x-3 p-3 rounded-lg border hover:bg-muted/50 cursor-pointer"
+                            onClick={() => {
+                              setSelectedQuestionsToRemove(prev =>
+                                prev.includes(question._id)
+                                  ? prev.filter(id => id !== question._id)
+                                  : [...prev, question._id]
+                              );
+                            }}
+                          >
+                            <Checkbox
+                              checked={selectedQuestionsToRemove.includes(question._id)}
+                              onCheckedChange={() => {}}
+                              className="mt-1"
+                            />
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-2 mb-1">
+                                <Badge variant="outline" className="text-xs">
+                                  {question.type}
+                                </Badge>
+                                <Badge variant="secondary" className="text-xs">
+                                  {question.points} pts
+                                </Badge>
+                                <Badge variant="outline" className="text-xs">
+                                  {question.difficulty}
+                                </Badge>
+                              </div>
+                              <p className="text-sm font-medium line-clamp-2">{question.question}</p>
+                              <p className="text-xs text-muted-foreground">
+                                {question.subType?.replace('-', ' ')}
+                              </p>
+                            </div>
+                          </div>
+                        ))
+                      ) : (
+                        <div className="text-center py-8 text-muted-foreground">
+                          No questions in this test
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </ScrollArea>
+            </TabsContent>
+          </Tabs>
+
+          <AlertDialogFooter className="mt-4">
+            <AlertDialogCancel onClick={() => {
+              setSelectedPassagesToAdd([]);
+              setSelectedQuestionsToAdd([]);
+              setSelectedPassagesToRemove([]);
+              setSelectedQuestionsToRemove([]);
+              setIsManagingContent(false);
+            }}>
+              Cancel
+            </AlertDialogCancel>
+            <AlertDialogAction onClick={handleSaveContentChanges} disabled={saving}>
+              {saving ? (
+                <>
+                  <Save className="mr-2 h-4 w-4 animate-pulse" />
+                  Saving...
+                </>
+              ) : (
+                <>
+                  <Check className="mr-2 h-4 w-4" />
+                  Save Changes
+                </>
+              )}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
