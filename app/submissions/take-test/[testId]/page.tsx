@@ -134,26 +134,48 @@ export default function TakeTestPage() {
   const [submissionId, setSubmissionId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
   const [questionStartTime, setQuestionStartTime] = useState(Date.now());
 
   const assignmentId = searchParams.get('assignment');
   const existingSubmissionId = searchParams.get('submission');
 
   const handleSubmitTest = useCallback(async () => {
-    if (!submissionId) return;
+    if (!submissionId || submitting) return;
 
+    setSubmitting(true);
+    
     try {
-      await authService.apiRequest(`/submissions/submit/${submissionId}`, {
+      const response = await authService.apiRequest(`/submissions/submit/${submissionId}`, {
         method: 'POST'
       });
 
+      // Response structure: { message, score, totalPoints, percentage, isPassed }
+      console.log('Test submitted successfully:', response);
+      
+      // Store submission result temporarily for results page if needed
+      if (typeof window !== 'undefined') {
+        sessionStorage.setItem(`submission_result_${submissionId}`, JSON.stringify({
+          score: response.score,
+          totalPoints: response.totalPoints,
+          percentage: response.percentage,
+          isPassed: response.isPassed,
+          message: response.message,
+          submittedAt: new Date().toISOString()
+        }));
+      }
+      
+      // Navigate to results page with the submission response data
       router.push(`/submissions/results/${submissionId}`);
     } catch (error) {
       console.error('Failed to submit test:', error);
-      // For demo, navigate anyway
+      setSubmitting(false);
+      // Show user-friendly error message
+      alert('Failed to submit test. Please try again or contact support.');
+      // For demo, navigate anyway (remove this in production)
       router.push(`/submissions/results/${submissionId}`);
     }
-  }, [submissionId, router]);
+  }, [submissionId, submitting, router]);
 
   const initializeTest = useCallback(async (testId: string) => {
     try {
@@ -1037,9 +1059,10 @@ export default function TakeTestPage() {
                   <AlertDialogTrigger asChild>
                     <Button 
                       className="w-full bg-gradient-to-r from-[#004875] to-[#003a5c] hover:from-[#003a5c] hover:to-[#002a3c] text-white shadow-md font-semibold py-6 text-base"
+                      disabled={submitting}
                     >
                       <Send className="h-5 w-5 mr-2" />
-                      Submit Test
+                      {submitting ? 'Submitting...' : 'Submit Test'}
                     </Button>
                   </AlertDialogTrigger>
                   <AlertDialogContent className="border-slate-200">
@@ -1052,8 +1075,12 @@ export default function TakeTestPage() {
                     </AlertDialogHeader>
                     <AlertDialogFooter>
                       <AlertDialogCancel className="border-slate-300">Cancel</AlertDialogCancel>
-                      <AlertDialogAction onClick={handleSubmitTest} className="bg-[#004875] hover:bg-[#003a5c]">
-                        Submit Test
+                      <AlertDialogAction 
+                        onClick={handleSubmitTest} 
+                        className="bg-[#004875] hover:bg-[#003a5c]"
+                        disabled={submitting}
+                      >
+                        {submitting ? 'Submitting...' : 'Submit Test'}
                       </AlertDialogAction>
                     </AlertDialogFooter>
                   </AlertDialogContent>
