@@ -22,6 +22,10 @@ class AuthService {
     return localStorage.getItem(this.tokenKey);
   }
 
+  getBaseUrl(): string {
+    return this.baseUrl;
+  }
+
   setToken(token: string): void {
     localStorage.setItem(this.tokenKey, token);
   }
@@ -105,7 +109,15 @@ class AuthService {
     const response = await this.authenticatedRequest(endpoint, options);
     
     if (!response.ok) {
-      throw new Error(`API request failed: ${response.status}`);
+      // Log detailed error information
+      const errorText = await response.text();
+      console.error(`API Error ${response.status}:`, errorText);
+      console.error('Request details:', {
+        endpoint,
+        method: options.method || 'GET',
+        body: options.body
+      });
+      throw new Error(`API request failed: ${response.status} - ${errorText}`);
     }
 
     return response.json();

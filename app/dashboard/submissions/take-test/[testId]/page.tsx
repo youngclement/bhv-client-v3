@@ -30,9 +30,11 @@ import {
   BookOpen,
   Volume2,
   PenTool,
-  AlertTriangle
+  AlertTriangle,
+  ImageIcon
 } from 'lucide-react';
 import { authService } from '@/lib/auth';
+import Image from 'next/image';
 
 interface Question {
   _id: string;
@@ -41,8 +43,32 @@ interface Question {
   question: string;
   passage?: string;
   audioUrl?: string;
+  audioFile?: {
+    url: string;
+    publicId: string;
+    originalName: string;
+    format: string;
+    bytes: number;
+    duration?: number;
+  };
+  imageFile?: {
+    url: string;
+    publicId: string;
+    originalName: string;
+    format: string;
+    bytes: number;
+    width: number;
+    height: number;
+  };
   options?: string[];
+  correctAnswer?: string;
   points: number;
+  difficulty: 'easy' | 'medium' | 'hard';
+  tags: string[];
+  instructionText?: string;
+  wordLimit?: number;
+  blanksCount?: number;
+  section?: number;
   answer?: string;
   timeSpent?: number;
 }
@@ -51,10 +77,19 @@ interface Test {
   _id: string;
   title: string;
   description: string;
-  type: 'reading' | 'listening' | 'writing' | 'mixed';
-  duration: number;
+  type: 'reading' | 'listening' | 'writing' | 'mixed' | 'full';
+  passages: any[];
   questions: Question[];
-  passages?: any[];
+  duration: number;
+  totalPoints: number;
+  isActive: boolean;
+  createdBy: {
+    _id: string;
+    firstName: string;
+    lastName: string;
+  };
+  createdAt: string;
+  updatedAt: string;
 }
 
 export default function TakeTestPage() {
@@ -77,7 +112,7 @@ export default function TakeTestPage() {
     if (params.testId) {
       initializeTest(params.testId as string);
     }
-  }, [params.testId]);
+  }, [params.testId, initializeTest]);
 
   // Timer effect
   useEffect(() => {
@@ -94,54 +129,28 @@ export default function TakeTestPage() {
 
       return () => clearInterval(timer);
     }
-  }, [timeRemaining]);
+  }, [timeRemaining, handleSubmitTest]);
 
-  const initializeTest = async (testId: string) => {
+  const handleSubmitTest = useCallback(async () => {
+    if (!submissionId) return;
+
     try {
-      // Mock test data - replace with actual API call
-      const mockTest: Test = {
-        _id: testId,
-        title: 'IELTS Reading Practice Test 1',
-        description: 'Academic reading test with 3 passages',
-        type: 'reading',
-        duration: 60,
-        questions: [
-          {
-            _id: 'q1',
-            type: 'reading',
-            subType: 'multiple-choice',
-            question: 'What is the main topic of the passage?',
-            passage: 'The Industrial Revolution, which took place from the 18th to 19th centuries, was a period during which predominantly agrarian, rural societies in Europe and America became industrial and urban...',
-            options: [
-              'The history of agriculture',
-              'The Industrial Revolution',
-              'Urban development',
-              'European society'
-            ],
-            points: 1
-          },
-          {
-            _id: 'q2',
-            type: 'reading',
-            subType: 'fill-blank',
-            question: 'The Industrial Revolution took place from the _____ to _____ centuries.',
-            passage: 'The Industrial Revolution, which took place from the 18th to 19th centuries, was a period during which predominantly agrarian, rural societies in Europe and America became industrial and urban...',
-            points: 2
-          },
-          {
-            _id: 'q3',
-            type: 'reading',
-            subType: 'true-false',
-            question: 'The Industrial Revolution only affected European societies.',
-            passage: 'The Industrial Revolution, which took place from the 18th to 19th centuries, was a period during which predominantly agrarian, rural societies in Europe and America became industrial and urban...',
-            options: ['True', 'False', 'Not Given'],
-            points: 1
-          }
-        ]
-      };
+      await authService.apiRequest(`/submissions/submit/${submissionId}`, {
+        method: 'POST'
+      });
 
-      setTest(mockTest);
-      setTimeRemaining(mockTest.duration * 60); // Convert to seconds
+      router.push(`/dashboard/submissions/results/${submissionId}`);
+    } catch (error) {
+      console.error('Failed to submit test:', error);
+    }
+  }, [submissionId, router]);
+
+  const initializeTest = useCallback(async (testId: string) => {
+    try {
+      // Call actual API to get test data
+      const testData = await authService.apiRequest(`/tests/${testId}`);
+      setTest(testData);
+      setTimeRemaining(testData.duration * 60); // Convert to seconds
 
       // Start or continue submission
       if (existingSubmissionId) {
@@ -149,48 +158,32 @@ export default function TakeTestPage() {
         // Load existing answers
       } else if (assignmentId) {
         // Start new submission
-        const response = await startSubmission(testId, assignmentId);
-        setSubmissionId(response.submissionId);
+        const submission = await authService.startSubmission(testId, assignmentId);
+        setSubmissionId(submission._id);
       }
-
-      setQuestionStartTime(Date.now());
     } catch (error) {
       console.error('Failed to initialize test:', error);
     } finally {
       setLoading(false);
     }
-  };
+  }, [assignmentId, existingSubmissionId]);
 
-  const startSubmission = async (testId: string, assignmentId: string) => {
-    // Mock API call - replace with actual implementation
-    return { submissionId: 'mock-submission-id' };
-  };
-
-  const saveAnswer = useCallback(async (questionId: string, answer: string) => {
-    if (!submissionId) return;
-
-    setSaving(true);
-    try {
-      const timeSpent = Math.floor((Date.now() - questionStartTime) / 1000);
-
-      // Mock API call - replace with actual implementation
-      // await authService.apiRequest(`/submissions/answer/${submissionId}`, {
-      //   method: 'POST',
-      //   body: JSON.stringify({ questionId, answer, timeSpent })
-      // });
-
-      console.log('Saving answer:', { questionId, answer, timeSpent });
-    } catch (error) {
-      console.error('Failed to save answer:', error);
-    } finally {
-      setSaving(false);
+  const handleAnswerChange = useCallback(async (questionId: string, answer: string) => {
+    setAnswers(prev => ({ ...prev, [questionId]: answer }));
+    
+    // Auto-save answer
+    if (submissionId) {
+      setSaving(true);
+      try {
+        const timeSpent = Math.floor((Date.now() - questionStartTime) / 1000);
+        await authService.saveAnswer(submissionId, questionId, answer, timeSpent);
+      } catch (error) {
+        console.error('Failed to save answer:', error);
+      } finally {
+        setSaving(false);
+      }
     }
   }, [submissionId, questionStartTime]);
-
-  const handleAnswerChange = (questionId: string, answer: string) => {
-    setAnswers(prev => ({ ...prev, [questionId]: answer }));
-    saveAnswer(questionId, answer);
-  };
 
   const handleNextQuestion = () => {
     if (currentQuestionIndex < (test?.questions.length || 0) - 1) {
@@ -206,20 +199,7 @@ export default function TakeTestPage() {
     }
   };
 
-  const handleSubmitTest = async () => {
-    if (!submissionId) return;
 
-    try {
-      // Mock API call - replace with actual implementation
-      // await authService.apiRequest(`/submissions/submit/${submissionId}`, {
-      //   method: 'POST'
-      // });
-
-      router.push(`/dashboard/submissions/results/${submissionId}`);
-    } catch (error) {
-      console.error('Failed to submit test:', error);
-    }
-  };
 
   const formatTime = (seconds: number) => {
     const hours = Math.floor(seconds / 3600);
@@ -238,6 +218,15 @@ export default function TakeTestPage() {
       case 'listening': return <Volume2 className="h-4 w-4" />;
       case 'writing': return <PenTool className="h-4 w-4" />;
       default: return null;
+    }
+  };
+
+  const getDifficultyColor = (difficulty: string) => {
+    switch (difficulty) {
+      case 'easy': return 'bg-green-100 text-green-800 border-green-200';
+      case 'medium': return 'bg-yellow-100 text-yellow-800 border-yellow-200';
+      case 'hard': return 'bg-red-100 text-red-800 border-red-200';
+      default: return 'bg-gray-100 text-gray-800 border-gray-200';
     }
   };
 
@@ -324,7 +313,10 @@ export default function TakeTestPage() {
             <CardHeader>
               <div className="flex items-center justify-between">
                 <CardTitle className="flex items-center gap-2">
-                  <Badge variant="outline">{currentQuestion?.subType.replace('-', ' ')}</Badge>
+                  <Badge variant="outline" className={getDifficultyColor(currentQuestion?.difficulty || 'medium')}>
+                    {currentQuestion?.difficulty}
+                  </Badge>
+                  <Badge variant="secondary">{currentQuestion?.subType.replace('-', ' ')}</Badge>
                   <span>{currentQuestion?.points} point{currentQuestion?.points > 1 ? 's' : ''}</span>
                 </CardTitle>
                 {saving && (
@@ -338,85 +330,237 @@ export default function TakeTestPage() {
             <CardContent>
               <ScrollArea className="max-h-[70vh] pr-4">
                 <div className="space-y-6">
-                  {/* Passage */}
-                  {currentQuestion?.passage && (
+                  
+                  {/* Detailed Instructions for Writing */}
+                  {currentQuestion?.instructionText && (
                     <div className="space-y-2">
-                      <Label className="text-sm font-medium">Passage</Label>
-                      <div className="p-4 bg-muted rounded-lg">
+                      <Label className="text-sm font-medium">Instructions</Label>
+                      <div className="p-4 bg-blue-50 rounded-lg border border-blue-200">
                         <p className="text-sm leading-relaxed whitespace-pre-wrap">
-                          {currentQuestion?.passage}
+                          {currentQuestion.instructionText}
                         </p>
                       </div>
                     </div>
                   )}
 
-                  {/* Audio */}
-                  {currentQuestion?.audioUrl && (
+                  {/* Image for Reading/Writing Task 1 */}
+                  {currentQuestion?.imageFile && (
                     <div className="space-y-2">
-                      <Label className="text-sm font-medium">Audio</Label>
-                      <div className="p-4 bg-muted rounded-lg">
-                        <audio controls className="w-full">
-                          <source src={currentQuestion?.audioUrl} type="audio/mpeg" />
-                          Your browser does not support the audio element.
-                        </audio>
+                      <Label className="text-sm font-medium flex items-center gap-2">
+                        <ImageIcon className="h-4 w-4" />
+                        {currentQuestion.type === 'writing' ? 'Chart/Graph to Analyze' : 'Reference Image'}
+                      </Label>
+                      <div className="border rounded-lg overflow-hidden bg-white">
+                        <Image
+                          src={currentQuestion.imageFile.url}
+                          alt={currentQuestion.imageFile.originalName}
+                          width={currentQuestion.imageFile.width}
+                          height={currentQuestion.imageFile.height}
+                          className="w-full h-auto max-h-96 object-contain"
+                        />
+                        <div className="p-2 text-xs text-muted-foreground bg-gray-50">
+                          {currentQuestion.imageFile.originalName} • {currentQuestion.imageFile.width}×{currentQuestion.imageFile.height} • {Math.round(currentQuestion.imageFile.bytes / 1024)}KB
+                        </div>
                       </div>
                     </div>
                   )}
 
-                  {/* Question */}
-                  <div className="space-y-4">
-                    <Label className="text-base font-medium">{currentQuestion?.question}</Label>
-
-                    {/* Multiple Choice */}
-                    {currentQuestion?.options && currentQuestion?.subType === 'multiple-choice' && (
-                      <RadioGroup
-                        value={answers[currentQuestion?._id] || ''}
-                        onValueChange={(value) => handleAnswerChange(currentQuestion?._id, value)}
-                      >
-                        {currentQuestion?.options.map((option, index) => (
-                          <div key={index} className="flex items-center space-x-2">
-                            <RadioGroupItem value={option} id={`option-${currentQuestionIndex}-${index}`} />
-                            <Label htmlFor={`option-${currentQuestionIndex}-${index}`} className="cursor-pointer">
-                              {option}
-                            </Label>
+                  {/* Audio for Listening Questions */}
+                  {(currentQuestion?.audioFile || currentQuestion?.audioUrl) && currentQuestion?.type === 'listening' && (
+                    <div className="space-y-2">
+                      <Label className="text-sm font-medium flex items-center gap-2">
+                        <Volume2 className="h-4 w-4" />
+                        Listening Audio
+                      </Label>
+                      <div className="p-4 bg-blue-50 rounded-lg border border-blue-200">
+                        <audio controls className="w-full mb-2">
+                          <source src={currentQuestion.audioFile?.url || currentQuestion.audioUrl} type="audio/mpeg" />
+                          Your browser does not support the audio element.
+                        </audio>
+                        {currentQuestion.audioFile && (
+                          <div className="text-xs text-muted-foreground">
+                            {currentQuestion.audioFile.originalName} • {currentQuestion.audioFile.duration ? `${Math.round(currentQuestion.audioFile.duration)}s` : ''} • {Math.round(currentQuestion.audioFile.bytes / 1024)}KB
                           </div>
-                        ))}
+                        )}
+                        <div className="text-xs text-muted-foreground mt-2">
+                          💡 You can replay the audio multiple times. Listen carefully before answering.
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Passage for Reading */}
+                  {currentQuestion?.passage && (
+                    <div className="space-y-2">
+                      <Label className="text-sm font-medium">Reading Passage</Label>
+                      <div className="p-4 bg-muted rounded-lg border">
+                        <p className="text-sm leading-relaxed whitespace-pre-wrap">
+                          {currentQuestion.passage}
+                        </p>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Question Text */}
+                  <div className="space-y-2">
+                    <Label className="text-base font-semibold">Question {currentQuestionIndex + 1}</Label>
+                    <div className="p-4 bg-white rounded-lg border-l-4 border-primary">
+                      <p className="text-base leading-relaxed whitespace-pre-wrap">
+                        {currentQuestion?.question}
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Writing Word Limit */}
+                  {currentQuestion?.type === 'writing' && currentQuestion?.wordLimit && (
+                    <div className="p-3 bg-amber-50 rounded-lg border border-amber-200">
+                      <div className="flex items-center gap-2 text-amber-800">
+                        <PenTool className="h-4 w-4" />
+                        <span className="font-medium">Word Limit: {currentQuestion.wordLimit} words</span>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Answer Section */}
+                  <div className="space-y-4">
+                    <Label className="text-base font-semibold">Your Answer</Label>
+                    
+                    {/* Multiple Choice */}
+                    {currentQuestion?.options && currentQuestion?.subType.includes('multiple-choice') && (
+                      <RadioGroup 
+                        value={answers[currentQuestion._id] || ''} 
+                        onValueChange={(value) => handleAnswerChange(currentQuestion._id, value)}
+                      >
+                        <div className="space-y-3">
+                          {currentQuestion.options.map((option, index) => (
+                            <div key={index} className="flex items-center space-x-3 p-3 rounded-lg border hover:bg-muted/50">
+                              <RadioGroupItem value={option} id={`option-${index}`} />
+                              <Label htmlFor={`option-${index}`} className="flex-1 cursor-pointer">
+                                <span className="font-medium mr-2">{String.fromCharCode(65 + index)}.</span>
+                                {option}
+                              </Label>
+                            </div>
+                          ))}
+                        </div>
                       </RadioGroup>
                     )}
 
                     {/* True/False/Not Given */}
-                    {currentQuestion?.options && currentQuestion?.subType === 'true-false' && (
-                      <RadioGroup
-                        value={answers[currentQuestion?._id] || ''}
-                        onValueChange={(value) => handleAnswerChange(currentQuestion?._id, value)}
+                    {currentQuestion?.subType.includes('true-false') && (
+                      <RadioGroup 
+                        value={answers[currentQuestion._id] || ''} 
+                        onValueChange={(value) => handleAnswerChange(currentQuestion._id, value)}
                       >
-                        {currentQuestion?.options.map((option, index) => (
-                          <div key={index} className="flex items-center space-x-2">
-                            <RadioGroupItem value={option} id={`tf-${currentQuestionIndex}-${index}`} />
-                            <Label htmlFor={`tf-${currentQuestionIndex}-${index}`} className="cursor-pointer">
-                              {option}
-                            </Label>
-                          </div>
-                        ))}
+                        <div className="space-y-3">
+                          {['True', 'False', 'Not Given'].map((option) => (
+                            <div key={option} className="flex items-center space-x-3 p-3 rounded-lg border hover:bg-muted/50">
+                              <RadioGroupItem value={option} id={option} />
+                              <Label htmlFor={option} className="flex-1 cursor-pointer font-medium">
+                                {option}
+                              </Label>
+                            </div>
+                          ))}
+                        </div>
                       </RadioGroup>
                     )}
 
-                    {/* Fill in the blank / Short answer */}
-                    {(currentQuestion?.subType === 'fill-blank' || currentQuestion?.subType === 'short-answer') && (
+                    {/* Fill in the Blank */}
+                    {currentQuestion?.subType === 'fill-blank' && (
+                      <div className="space-y-3">
+                        {Array.from({ length: currentQuestion.blanksCount || 1 }).map((_, index) => (
+                          <div key={index} className="space-y-1">
+                            <Label htmlFor={`blank-${index}`} className="text-sm">
+                              Blank {index + 1}
+                            </Label>
+                            <Input
+                              id={`blank-${index}`}
+                              placeholder={`Enter answer for blank ${index + 1}...`}
+                              value={(() => {
+                                try {
+                                  const parsedAnswers = JSON.parse(answers[currentQuestion._id] || '[]');
+                                  return parsedAnswers[index] || '';
+                                } catch {
+                                  return '';
+                                }
+                              })()}
+                              onChange={(e) => {
+                                try {
+                                  const parsedAnswers = JSON.parse(answers[currentQuestion._id] || '[]');
+                                  while (parsedAnswers.length <= index) parsedAnswers.push('');
+                                  parsedAnswers[index] = e.target.value;
+                                  handleAnswerChange(currentQuestion._id, JSON.stringify(parsedAnswers));
+                                } catch {
+                                  const newAnswers = Array(currentQuestion.blanksCount || 1).fill('');
+                                  newAnswers[index] = e.target.value;
+                                  handleAnswerChange(currentQuestion._id, JSON.stringify(newAnswers));
+                                }
+                              }}
+                              className="w-full"
+                            />
+                          </div>
+                        ))}
+                      </div>
+                    )}
+
+                    {/* Short Answer */}
+                    {currentQuestion?.subType === 'short-answer' && (
                       <Input
-                        placeholder="Enter your answer..."
-                        value={answers[currentQuestion?._id] || ''}
-                        onChange={(e) => handleAnswerChange(currentQuestion?._id, e.target.value)}
+                        placeholder="Enter your short answer..."
+                        value={answers[currentQuestion._id] || ''}
+                        onChange={(e) => handleAnswerChange(currentQuestion._id, e.target.value)}
+                        className="w-full"
                       />
                     )}
 
-                    {/* Writing tasks */}
-                    {(currentQuestion?.subType === 'task1' || currentQuestion?.subType === 'task2') && (
+                    {/* Writing Tasks (Essay, Task1, Task2) */}
+                    {currentQuestion?.type === 'writing' && ['essay', 'task1', 'task2'].includes(currentQuestion.subType) && (
+                      <div className="space-y-2">
+                        <Textarea
+                          placeholder={
+                            currentQuestion.subType === 'task1' 
+                              ? "Describe the chart/graph/diagram in detail. Identify key trends, comparisons, and notable features..."
+                              : currentQuestion.subType === 'task2'
+                              ? "Present your argument with clear introduction, body paragraphs with examples, and conclusion..."
+                              : "Write your essay here..."
+                          }
+                          value={answers[currentQuestion._id] || ''}
+                          onChange={(e) => handleAnswerChange(currentQuestion._id, e.target.value)}
+                          rows={12}
+                          className="w-full resize-none"
+                        />
+                        <div className="flex justify-between text-xs text-muted-foreground">
+                          <span>Word count: {answers[currentQuestion._id] ? answers[currentQuestion._id].split(/\s+/).filter(word => word.length > 0).length : 0} words</span>
+                          {currentQuestion.wordLimit && (
+                            <span className={answers[currentQuestion._id] && answers[currentQuestion._id].split(/\s+/).filter(word => word.length > 0).length > currentQuestion.wordLimit ? 'text-red-600' : ''}>
+                              Target: {currentQuestion.wordLimit} words
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Matching */}
+                    {currentQuestion?.subType === 'matching' && (
                       <Textarea
-                        placeholder="Write your response here..."
-                        rows={10}
+                        placeholder="Enter your matching answers (e.g., 1-A, 2-B, 3-C)..."
+                        value={answers[currentQuestion._id] || ''}
+                        onChange={(e) => handleAnswerChange(currentQuestion._id, e.target.value)}
+                        rows={4}
+                        className="w-full"
+                      />
+                    )}
+
+                    {/* Default Text Area for other types */}
+                    {(!currentQuestion?.options && 
+                     !currentQuestion?.subType.includes('true-false') && 
+                     !currentQuestion?.subType.includes('multiple-choice') && 
+                     !['fill-blank', 'short-answer', 'essay', 'task1', 'task2', 'matching'].includes(currentQuestion?.subType || '')) && (
+                      <Textarea
+                        placeholder="Enter your answer..."
                         value={answers[currentQuestion?._id] || ''}
                         onChange={(e) => handleAnswerChange(currentQuestion?._id, e.target.value)}
+                        rows={4}
+                        className="w-full"
                       />
                     )}
                   </div>
@@ -441,7 +585,7 @@ export default function TakeTestPage() {
                   disabled={currentQuestionIndex === 0}
                   className="flex-1"
                 >
-                  <ArrowLeft className="h-4 w-4 mr-1" />
+                  <ArrowLeft className="mr-2 h-4 w-4" />
                   Previous
                 </Button>
                 <Button
@@ -451,27 +595,29 @@ export default function TakeTestPage() {
                   className="flex-1"
                 >
                   Next
-                  <ArrowRight className="h-4 w-4 ml-1" />
+                  <ArrowRight className="ml-2 h-4 w-4" />
                 </Button>
               </div>
 
+              {/* Submit Test */}
               <AlertDialog>
                 <AlertDialogTrigger asChild>
                   <Button className="w-full" variant="default">
-                    <Send className="h-4 w-4 mr-2" />
+                    <Send className="mr-2 h-4 w-4" />
                     Submit Test
                   </Button>
                 </AlertDialogTrigger>
                 <AlertDialogContent>
                   <AlertDialogHeader>
-                    <AlertDialogTitle>Submit Test</AlertDialogTitle>
+                    <AlertDialogTitle>Submit Test?</AlertDialogTitle>
                     <AlertDialogDescription>
-                      Are you sure you want to submit your test? You have answered {answeredCount} out of {test.questions.length} questions.
-                      This action cannot be undone.
+                      Are you sure you want to submit your test? You won&apos;t be able to make changes after submission.
+                      <br /><br />
+                      Answered: {answeredCount} / {test.questions.length} questions
                     </AlertDialogDescription>
                   </AlertDialogHeader>
                   <AlertDialogFooter>
-                    <AlertDialogCancel>Cancel</AlertDialogCancel>
+                    <AlertDialogCancel>Continue Test</AlertDialogCancel>
                     <AlertDialogAction onClick={handleSubmitTest}>
                       Submit Test
                     </AlertDialogAction>
@@ -481,41 +627,40 @@ export default function TakeTestPage() {
             </CardContent>
           </Card>
 
-          {/* Question Overview */}
+          {/* Question Summary */}
           <Card>
             <CardHeader>
               <CardTitle>Question Overview</CardTitle>
             </CardHeader>
             <CardContent>
-              <ScrollArea className="h-64">
-                <div className="grid grid-cols-5 gap-2">
-                  {test.questions.map((_, index) => (
-                    <Button
-                      key={index}
-                      variant={currentQuestionIndex === index ? "default" : "outline"}
-                      size="sm"
-                      className={`h-8 w-8 p-0 ${answers[test.questions[index]._id]
-                        ? 'bg-green-100 border-green-300 text-green-800 hover:bg-green-200'
-                        : ''
-                        }`}
-                      onClick={() => {
-                        setCurrentQuestionIndex(index);
-                        setQuestionStartTime(Date.now());
-                      }}
-                    >
-                      {index + 1}
-                    </Button>
-                  ))}
-                </div>
-              </ScrollArea>
-              <div className="mt-4 text-xs text-muted-foreground">
-                <div className="flex items-center gap-2 mb-1">
-                  <div className="w-3 h-3 bg-green-100 border border-green-300 rounded"></div>
-                  <span>Answered</span>
+              <div className="grid grid-cols-5 gap-1">
+                {test.questions.map((_, index) => (
+                  <Button
+                    key={index}
+                    variant={index === currentQuestionIndex ? "default" : answers[test.questions[index]._id] ? "secondary" : "outline"}
+                    size="sm"
+                    onClick={() => {
+                      setCurrentQuestionIndex(index);
+                      setQuestionStartTime(Date.now());
+                    }}
+                    className="aspect-square p-0 text-xs"
+                  >
+                    {index + 1}
+                  </Button>
+                ))}
+              </div>
+              <div className="mt-4 space-y-2 text-xs text-muted-foreground">
+                <div className="flex items-center gap-2">
+                  <div className="w-3 h-3 bg-primary rounded"></div>
+                  Current
                 </div>
                 <div className="flex items-center gap-2">
-                  <div className="w-3 h-3 bg-white border border-gray-300 rounded"></div>
-                  <span>Not answered</span>
+                  <div className="w-3 h-3 bg-secondary rounded"></div>
+                  Answered
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="w-3 h-3 border border-border rounded"></div>
+                  Unanswered
                 </div>
               </div>
             </CardContent>
