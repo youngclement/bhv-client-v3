@@ -138,51 +138,92 @@ export default function QuestionDetailPage() {
         .map((tag: string) => tag.trim())
         .filter(Boolean);
 
-      // Check if we have files to upload
-      if (audioFile || imageFile) {
-        // Send as FormData if we have files
-        const formData = new FormData();
-        
-        // Add each field individually
-        Object.entries(editData).forEach(([key, value]) => {
-          if (key === 'tags') {
-            formData.append(key, JSON.stringify(tags));
-          } else if (Array.isArray(value)) {
-            formData.append(key, JSON.stringify(value));
-          } else if (value !== undefined && value !== null) {
-            formData.append(key, String(value));
-          }
-        });
-        
-        // Override tags with processed array
-        formData.set('tags', JSON.stringify(tags));
-        
-        // Add files if they exist
-        if (audioFile) {
-          formData.append('audioFile', audioFile);
-        }
-        if (imageFile) {
-          formData.append('imageFile', imageFile);
-        }
+      // Clean and filter data based on question type - only send core required fields
+      const questionDataToSend: any = {
+        type: editData.type,
+        subType: editData.subType,
+        question: editData.question,
+        points: editData.points,
+        difficulty: editData.difficulty,
+      };
 
-        await authService.apiRequest(`/questions/${question._id}`, {
-          method: 'PUT',
-          body: formData,
-          headers: {
-            // Don't set Content-Type, let browser set it with boundary for FormData
-          },
-        });
-      } else {
-        // Send as JSON if no files
-        const updateData = {
-          ...editData,
-          tags,
-        };
+      // Only add tags if they exist and are not empty
+      if (tags && tags.length > 0) {
+        questionDataToSend.tags = tags;
+      }
 
-        await authService.apiRequest(`/questions/${question._id}`, {
-          method: 'PUT',
-          body: JSON.stringify(updateData),
-        });
+      // Add type-specific fields
+      if (editData.type === 'reading' && editData.passage?.trim()) {
+        questionDataToSend.passage = editData.passage.trim();
+      }
+
+      if (editData.type === 'listening') {
+        if (editData.section) {
+          questionDataToSend.section = editData.section;
+        }
+        if (editData.wordLimit && editData.wordLimit > 0) {
+          questionDataToSend.wordLimit = editData.wordLimit;
+        }
+      }
+
+      if (editData.type === 'writing') {
+        if (editData.wordLimit && editData.wordLimit > 0) {
+          questionDataToSend.wordLimit = editData.wordLimit;
+        }
+      }
+
+      // Add options for multiple choice questions
+      if (editData.options && editData.options.some(opt => opt.trim())) {
+        const filteredOptions = editData.options.filter(opt => opt.trim());
+        if (filteredOptions.length > 0) {
+          questionDataToSend.options = filteredOptions;
+        }
+      }
+
+      // Add correct answer if provided
+      if (editData.correctAnswer?.trim()) {
+        questionDataToSend.correctAnswer = editData.correctAnswer.trim();
+      }
+
+      // Always send as FormData for consistency with create endpoint
+      const formData = new FormData();
+      
+      // Add each field individually instead of as JSON string
+      Object.entries(questionDataToSend).forEach(([key, value]) => {
+        if (Array.isArray(value)) {
+          // Handle arrays (like options, tags)
+          formData.append(key, JSON.stringify(value));
+        } else {
+          formData.append(key, String(value));
+        }
+      });
+      
+      // Add files if they exist
+      if (audioFile) {
+        formData.append('audioFile', audioFile);
+      }
+      if (imageFile) {
+        formData.append('imageFile', imageFile);
+      }
+
+      console.log('Updating question with FormData:', {
+        questionData: questionDataToSend,
+        hasAudio: !!audioFile,
+        hasImage: !!imageFile
+      });
+
+      // Use fetch directly for FormData to match create endpoint
+      const response = await fetch(`http://localhost:8000/api/questions/${question._id}`, {
+        method: 'PUT',
+        headers: {
+          'Authorization': `Bearer ${authService.getToken()}`
+        },
+        body: formData
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`API request failed: ${response.status} - ${errorText}`);
       }
 
       await fetchQuestion(question._id);
