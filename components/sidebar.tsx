@@ -25,8 +25,6 @@ import { useRouter } from 'next/navigation';
 
 const navigation = [
   { name: 'Dashboard', href: '/dashboard', icon: Home },
-  { name: 'Questions', href: '/dashboard/questions', icon: HelpCircle },
-  { name: 'Passages', href: '/dashboard/passages', icon: BookOpen },
   { name: 'Tests', href: '/dashboard/tests', icon: FileText },
   { name: 'Assignments', href: '/dashboard/assignments', icon: ClipboardList },
   { name: 'My Tests', href: '/dashboard/submissions', icon: MessageSquare },

@@ -1,7 +1,8 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useRouter, useParams } from 'next/navigation';
+import Image from 'next/image';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -28,7 +29,6 @@ import {
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { 
   ArrowLeft, 
   Edit2, 
@@ -41,7 +41,8 @@ import {
   Play,
   Clock,
   FileText,
-  Users
+  Users,
+  Plus
 } from 'lucide-react';
 import { authService } from '@/lib/auth';
 
@@ -51,9 +52,11 @@ interface Test {
   description: string;
   type: 'reading' | 'listening' | 'writing' | 'mixed';
   duration: number;
+  totalQuestions: number;
+  totalPoints: number;
   isActive: boolean;
+  status: 'draft' | 'published' | 'archived';
   questions: any[];
-  passages: any[];
   createdAt: string;
   updatedAt: string;
   createdBy: {
@@ -63,11 +66,74 @@ interface Test {
   };
 }
 
+interface Question {
+  _id: string;
+  testId: string;
+  questionNumber: number;
+  type: 'reading' | 'listening' | 'writing' | 'mixed';
+  subType: string;
+  question: string;
+  options?: string[];
+  correctAnswer?: string;
+  points: number;
+  difficulty: 'easy' | 'medium' | 'hard';
+  tags: string[];
+  section: number;
+  markingType: 'auto' | 'manual';
+  isActive: boolean;
+  createdBy: {
+    _id: string;
+    email: string;
+    firstName: string;
+    lastName: string;
+  };
+  createdAt: string;
+  updatedAt: string;
+}
+
+interface QuestionsResponse {
+  questions: Question[];
+  pagination: {
+    page: number;
+    limit: number;
+    total: number;
+    pages: number;
+    hasNext: boolean;
+    hasPrev: boolean;
+  };
+  testInfo: {
+    _id: string;
+    title: string;
+    type: string;
+    status: string;
+    totalQuestions: number;
+    totalPoints: number;
+  };
+  summary: {
+    totalQuestions: number;
+    bySection: Array<{
+      _id: number;
+      count: number;
+      totalPoints: number;
+    }>;
+    byType: Array<{
+      _id: string;
+      count: number;
+      totalPoints: number;
+    }>;
+    byDifficulty: Array<{
+      _id: string;
+      count: number;
+      totalPoints: number;
+    }>;
+  };
+}
+
 const testTypes = [
   { value: 'reading', label: 'Reading', icon: BookOpen },
   { value: 'listening', label: 'Listening', icon: Volume2 },
   { value: 'writing', label: 'Writing', icon: PenTool },
-  { value: 'mixed', label: 'Mixed', icon: Play },
+  { value: 'full', label: 'Full', icon: Play },
 ];
 
 export default function TestDetailPage() {
@@ -78,16 +144,16 @@ export default function TestDetailPage() {
   const [isEditing, setIsEditing] = useState(false);
   const [saving, setSaving] = useState(false);
   const [editData, setEditData] = useState<Partial<Test>>({});
+  
+  // Questions state
+  const [questionsData, setQuestionsData] = useState<QuestionsResponse | null>(null);
+  const [questions, setQuestions] = useState<Question[]>([]);
 
-  useEffect(() => {
-    if (params.id) {
-      fetchTest(params.id as string);
-    }
-  }, [params.id]);
-
-  const fetchTest = async (id: string) => {
+  const fetchTest = useCallback(async (id: string) => {
     try {
+      console.log('Fetching test with id:', id);
       const data = await authService.apiRequest(`/tests/${id}`);
+      console.log('Test data received:', data);
       setTest(data);
       setEditData(data);
     } catch (error) {
@@ -95,7 +161,41 @@ export default function TestDetailPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
+
+  const fetchQuestions = useCallback(async (id: string) => {
+    try {
+      console.log('Fetching questions for test id:', id);
+      const data = await authService.apiRequest(`/tests/${id}/questions`);
+      console.log('Questions data received:', data);
+      setQuestionsData(data);
+      setQuestions(data.questions);
+      
+      // Update test with summary info
+      if (data.testInfo) {
+        setTest(prev => prev ? {
+          ...prev,
+          totalQuestions: data.testInfo.totalQuestions,
+          totalPoints: data.testInfo.totalPoints
+        } : null);
+      }
+    } catch (error) {
+      console.error('Failed to fetch questions:', error);
+    }
+  }, []);
+
+  useEffect(() => {
+    console.log('useEffect triggered with params.id:', params.id);
+    const loadTestData = async () => {
+      if (params.id) {
+        console.log('Loading test data for:', params.id);
+        await fetchTest(params.id as string);
+        await fetchQuestions(params.id as string);
+      }
+    };
+    loadTestData();
+  }, [params.id, fetchTest, fetchQuestions]);
+
 
   const handleSave = async () => {
     if (!test) return;
@@ -115,6 +215,7 @@ export default function TestDetailPage() {
       setSaving(false);
     }
   };
+
 
   const handleDelete = async () => {
     if (!test) return;
@@ -198,9 +299,17 @@ export default function TestDetailPage() {
             </>
           ) : (
             <>
+              <Button 
+                variant="outline" 
+                onClick={() => router.push(`/dashboard/tests/${test._id}/builder`)}
+                className="bg-[#004875] text-white hover:bg-[#003a5c] border-[#004875]"
+              >
+                <Edit2 className="mr-2 h-4 w-4" />
+                Test Builder
+              </Button>
               <Button variant="outline" onClick={() => setIsEditing(true)}>
                 <Edit2 className="mr-2 h-4 w-4" />
-                Edit
+                Edit Test
               </Button>
               <AlertDialog>
                 <AlertDialogTrigger asChild>
@@ -319,74 +428,93 @@ export default function TestDetailPage() {
                         </div>
                       </div>
 
-                      <Tabs defaultValue="questions" className="w-full">
-                        <TabsList>
-                          <TabsTrigger value="questions">Questions ({test.questions?.length || 0})</TabsTrigger>
-                          <TabsTrigger value="passages">Passages ({test.passages?.length || 0})</TabsTrigger>
-                        </TabsList>
-                        
-                        <TabsContent value="questions" className="space-y-4">
-                          {test.questions && test.questions.length > 0 ? (
-                            <div className="space-y-3">
-                              {test.questions.map((question: any, index: number) => (
-                                <div key={question._id || index} className="p-4 border rounded-lg">
-                                  <div className="flex items-start justify-between">
-                                    <div className="flex-1">
-                                      <div className="flex items-center gap-2 mb-2">
-                                        <Badge variant="outline" className="text-xs">
-                                          {question.type}
-                                        </Badge>
-                                        <Badge variant="secondary" className="text-xs">
-                                          {question.points} pts
-                                        </Badge>
-                                      </div>
-                                      <p className="text-sm font-medium mb-1">{question.question}</p>
-                                      <p className="text-xs text-muted-foreground">
-                                        {question.subType?.replace('-', ' ')} • {question.difficulty}
-                                      </p>
+                      <div className="space-y-4">
+                        <div className="flex items-center justify-between">
+                          <h3 className="text-lg font-medium">Questions ({questions.length})</h3>
+                          <Button 
+                            onClick={() => router.push(`/dashboard/tests/${test._id}/builder`)} 
+                            size="sm"
+                            className="bg-[#004875] hover:bg-[#003a5c]"
+                          >
+                            <Plus className="h-4 w-4 mr-2" />
+                            Manage Questions
+                          </Button>
+                        </div>
+                        {questions && questions.length > 0 ? (
+                          <div className="space-y-3">
+                            {questions.map((question, index) => (
+                              <div key={question._id} className="p-4 border rounded-lg">
+                                <div className="flex items-start justify-between">
+                                  <div className="flex-1">
+                                    <div className="flex items-center gap-2 mb-2">
+                                      <Badge variant="outline" className="text-xs">
+                                        #{question.questionNumber}
+                                      </Badge>
+                                      <Badge variant="outline" className="text-xs">
+                                        {question.type}
+                                      </Badge>
+                                      <Badge variant="secondary" className="text-xs">
+                                        {question.points} pts
+                                      </Badge>
+                                      <Badge variant="outline" className="text-xs">
+                                        Section {question.section}
+                                      </Badge>
+                                      <Badge 
+                                        variant={question.difficulty === 'hard' ? 'destructive' : question.difficulty === 'medium' ? 'default' : 'secondary'} 
+                                        className="text-xs"
+                                      >
+                                        {question.difficulty}
+                                      </Badge>
                                     </div>
+                                    <p className="text-sm font-medium mb-1">{question.question}</p>
+                                    <p className="text-xs text-muted-foreground">
+                                      {question.subType?.replace('-', ' ')} • {question.markingType} marking
+                                    </p>
+                                    {question.tags && question.tags.length > 0 && (
+                                      <div className="flex gap-1 mt-2">
+                                        {question.tags.map((tag, tagIndex) => (
+                                          <Badge key={tagIndex} variant="outline" className="text-xs">
+                                            {tag}
+                                          </Badge>
+                                        ))}
+                                      </div>
+                                    )}
+                                    {question.options && question.options.length > 0 && (
+                                      <div className="mt-2">
+                                        <p className="text-xs text-muted-foreground mb-1">Options:</p>
+                                        <div className="grid grid-cols-2 gap-1">
+                                          {question.options.map((option, optIndex) => (
+                                            <div 
+                                              key={optIndex} 
+                                              className={`text-xs p-1 rounded ${option === question.correctAnswer ? 'bg-green-100 text-green-800' : 'bg-muted'}`}
+                                            >
+                                              {String.fromCharCode(65 + optIndex)}. {option}
+                                            </div>
+                                          ))}
+                                        </div>
+                                      </div>
+                                    )}
                                   </div>
                                 </div>
-                              ))}
+                              </div>
+                            ))}
+                          </div>
+                        ) : (
+                          <div className="text-center py-8 text-muted-foreground">
+                            <div className="space-y-2">
+                              <p>No questions added to this test yet</p>
+                              <Button 
+                                onClick={() => router.push(`/dashboard/tests/${test._id}/builder`)} 
+                                size="sm"
+                                className="bg-[#004875] hover:bg-[#003a5c]"
+                              >
+                                <Plus className="h-4 w-4 mr-2" />
+                                Start Building
+                              </Button>
                             </div>
-                          ) : (
-                            <div className="text-center py-8 text-muted-foreground">
-                              No questions added to this test
-                            </div>
-                          )}
-                        </TabsContent>
-
-                        <TabsContent value="passages" className="space-y-4">
-                          {test.passages && test.passages.length > 0 ? (
-                            <div className="space-y-3">
-                              {test.passages.map((passage: any, index: number) => (
-                                <div key={passage._id || index} className="p-4 border rounded-lg">
-                                  <div className="flex items-start justify-between">
-                                    <div className="flex-1">
-                                      <div className="flex items-center gap-2 mb-2">
-                                        <Badge variant="outline" className="text-xs">
-                                          {passage.type}
-                                        </Badge>
-                                        <Badge variant="secondary" className="text-xs">
-                                          {passage.questions?.length || 0} questions
-                                        </Badge>
-                                      </div>
-                                      <p className="text-sm font-medium mb-1">{passage.title}</p>
-                                      <p className="text-xs text-muted-foreground truncate">
-                                        {passage.content?.substring(0, 100)}...
-                                      </p>
-                                    </div>
-                                  </div>
-                                </div>
-                              ))}
-                            </div>
-                          ) : (
-                            <div className="text-center py-8 text-muted-foreground">
-                              No passages added to this test
-                            </div>
-                          )}
-                        </TabsContent>
-                      </Tabs>
+                          </div>
+                        )}
+                      </div>
                     </>
                   )}
                 </div>
@@ -396,6 +524,77 @@ export default function TestDetailPage() {
         </div>
 
         <div className="space-y-6">
+          {/* Questions Summary */}
+          {questionsData && (
+            <Card>
+              <CardHeader>
+                <CardTitle>Questions Summary</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="text-center p-3 bg-muted/50 rounded-lg">
+                    <div className="text-2xl font-bold text-primary">{questionsData.summary.totalQuestions}</div>
+                    <div className="text-xs text-muted-foreground">Total Questions</div>
+                  </div>
+                  <div className="text-center p-3 bg-muted/50 rounded-lg">
+                    <div className="text-2xl font-bold text-primary">{questionsData.summary.bySection.reduce((sum, item) => sum + item.totalPoints, 0)}</div>
+                    <div className="text-xs text-muted-foreground">Total Points</div>
+                  </div>
+                </div>
+
+                {/* By Type */}
+                {questionsData.summary.byType.length > 0 && (
+                  <div className="space-y-2">
+                    <Label className="text-sm font-medium">By Type</Label>
+                    <div className="space-y-1">
+                      {questionsData.summary.byType.map((item) => (
+                        <div key={item._id} className="flex items-center justify-between text-sm">
+                          <span className="capitalize">{item._id.replace('-', ' ')}</span>
+                          <Badge variant="outline" className="text-xs">{item.count}</Badge>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* By Difficulty */}
+                {questionsData.summary.byDifficulty.length > 0 && (
+                  <div className="space-y-2">
+                    <Label className="text-sm font-medium">By Difficulty</Label>
+                    <div className="space-y-1">
+                      {questionsData.summary.byDifficulty.map((item) => (
+                        <div key={item._id} className="flex items-center justify-between text-sm">
+                          <span className="capitalize">{item._id}</span>
+                          <Badge 
+                            variant={item._id === 'hard' ? 'destructive' : item._id === 'medium' ? 'default' : 'secondary'} 
+                            className="text-xs"
+                          >
+                            {item.count}
+                          </Badge>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* By Section */}
+                {questionsData.summary.bySection.length > 0 && (
+                  <div className="space-y-2">
+                    <Label className="text-sm font-medium">By Section</Label>
+                    <div className="space-y-1">
+                      {questionsData.summary.bySection.map((item) => (
+                        <div key={item._id} className="flex items-center justify-between text-sm">
+                          <span>Section {item._id}</span>
+                          <Badge variant="outline" className="text-xs">{item.count}</Badge>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          )}
+
           <Card>
             <CardHeader>
               <CardTitle>Test Info</CardTitle>
@@ -432,8 +631,8 @@ export default function TestDetailPage() {
                     {test.questions?.length || 0} questions
                   </div>
                   <div className="flex items-center gap-1 text-sm">
-                    <BookOpen className="h-4 w-4 text-muted-foreground" />
-                    {test.passages?.length || 0} passages
+                    <Users className="h-4 w-4 text-muted-foreground" />
+                    {test.totalPoints || 0} total points
                   </div>
                 </div>
               </div>
@@ -456,6 +655,7 @@ export default function TestDetailPage() {
           </Card>
         </div>
       </div>
+
     </div>
   );
 }

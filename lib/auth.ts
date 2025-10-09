@@ -14,7 +14,7 @@ interface AuthResponse {
 }
 
 class AuthService {
-  private baseUrl = 'http://localhost:8000/api';
+  private baseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api';
   private tokenKey = 'auth_token';
 
   getToken(): string | null {
@@ -95,13 +95,19 @@ class AuthService {
       throw new Error('No authentication token');
     }
 
+    const headers: Record<string, string> = {
+      ...options.headers as Record<string, string>,
+      'Authorization': `Bearer ${token}`,
+    };
+
+    // Only set Content-Type for non-FormData requests
+    if (!(options.body instanceof FormData)) {
+      headers['Content-Type'] = 'application/json';
+    }
+
     return fetch(`${this.baseUrl}${endpoint}`, {
       ...options,
-      headers: {
-        ...options.headers,
-        'Authorization': `Bearer ${token}`,
-        'Content-Type': 'application/json',
-      },
+      headers,
     });
   }
 

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -65,28 +65,39 @@ export default function TestResultsPage() {
   const params = useParams();
   const [result, setResult] = useState<SubmissionResult | null>(null);
   const [loading, setLoading] = useState(true);
-  useEffect(() => {
-    // Auto-redirect back to tests list after viewing results
-    const timer = setTimeout(() => {
-      router.push('/submissions');
-    }, 8000);
-    return () => clearTimeout(timer);
-  }, [router]);
 
-  useEffect(() => {
-    if (params.submissionId) {
-      fetchResults(params.submissionId as string);
-    }
-  }, [params.submissionId]);
-
-  const fetchResults = async (submissionId: string) => {
+  const fetchResults = useCallback(async (submissionId: string) => {
     try {
       if (!authService.isAuthenticated()) {
         router.push('/login');
         return;
       }
 
-      // Fetch submission results
+      // Check for immediate submission result in sessionStorage first
+      const immediateResult = sessionStorage.getItem(`submission_result_${submissionId}`);
+      if (immediateResult) {
+        const parsedResult = JSON.parse(immediateResult);
+        console.log('Using immediate submission result:', parsedResult);
+        
+        // Create a simplified result object for immediate display
+        const quickResult: SubmissionResult = {
+          _id: submissionId,
+          score: parsedResult.score,
+          totalPoints: parsedResult.totalPoints,
+          earnedPoints: parsedResult.score, // Assuming score is the earned points
+          submittedAt: parsedResult.submittedAt,
+          timeSpent: 0, // Will be updated by full API call
+          status: 'completed',
+          questionResults: [], // Will be populated by full API call
+          testId: { _id: '', title: 'Test Results', type: 'mixed', duration: 0 }
+        };
+        
+        setResult(quickResult);
+        // Clean up sessionStorage
+        sessionStorage.removeItem(`submission_result_${submissionId}`);
+      }
+
+      // Fetch full submission results
       const data = await authService.apiRequest(`/submissions/${submissionId}`);
       console.log('Raw submission data:', data);
 
@@ -123,7 +134,13 @@ export default function TestResultsPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [router]);
+
+  useEffect(() => {
+    if (params.submissionId) {
+      fetchResults(params.submissionId as string);
+    }
+  }, [params.submissionId, fetchResults]);
 
   const getScoreColor = (score: number) => {
     if (score >= 90) return 'text-green-600';

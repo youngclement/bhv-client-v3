@@ -23,16 +23,39 @@ import {
 } from 'lucide-react';
 import { authService } from '@/lib/auth';
 import { format } from 'date-fns';
+import { AudioPlayer } from '@/components/ui/audio-player';
 
 interface Question {
   _id: string;
-  number: number;
+  number?: number;
   type: string;
-  prompt: string;
+  subType?: string;
+  prompt?: string;
+  question?: string;
   options?: string[];
   paragraphRef?: string;
   correctAnswer?: string;
   points?: number;
+  audioFile?: {
+    url: string;
+    publicId?: string;
+    originalName?: string;
+    format?: string;
+    bytes?: number;
+    duration?: number;
+  };
+  imageFile?: {
+    url: string;
+    publicId?: string;
+    originalName?: string;
+    format?: string;
+    bytes?: number;
+    width?: number;
+    height?: number;
+  };
+  section?: number;
+  instructionText?: string;
+  wordLimit?: number;
 }
 
 interface Section {
@@ -112,13 +135,8 @@ export default function TestResultsPage() {
   const [questionIndex, setQuestionIndex] = useState<Record<string, any>>({});
   const questionIndexMap = questionIndex;
   const [loading, setLoading] = useState(true);
-  useEffect(() => {
-    // Auto-redirect back to tests list after viewing results
-    const timer = setTimeout(() => {
-      router.push('/dashboard/submissions');
-    }, 8000);
-    return () => clearTimeout(timer);
-  }, [router]);
+  const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
+  const questionRefs = useState<Record<string, HTMLDivElement | null>>(() => ({}))[0];
 
   useEffect(() => {
     if (params.submissionId) {
@@ -140,6 +158,10 @@ export default function TestResultsPage() {
         (p?.questionSections || []).forEach((s: any) => {
           (s?.questions || []).forEach((q: any) => { if (typeof q === 'string') ids.push(q); });
         });
+      });
+      // Also handle direct questions (not in passages)
+      (data?.testId?.questions || []).forEach((q: any) => {
+        if (typeof q === 'string') ids.push(q);
       });
       const unique = Array.from(new Set(ids));
       const idx: Record<string, any> = {};
@@ -221,7 +243,9 @@ export default function TestResultsPage() {
 
   // Build question map from passages (supports questionSections with IDs and legacy sections without IDs)
   const questionMap = new Map<string, { question: any; passage: any; section: any }>();
-  result.testId.passages.forEach((passage: any) => {
+  
+  // Handle passages with questions
+  (result.testId.passages || []).forEach((passage: any) => {
     if (passage?.questionSections?.length) {
       passage.questionSections.forEach((section: any) => {
         (section.questions || []).forEach((q: any) => {
@@ -245,12 +269,43 @@ export default function TestResultsPage() {
     }
   });
 
+  // Handle direct questions (not in passages) - for listening/writing tests
+  (result.testId.questions || []).forEach((q: any) => {
+    const question = typeof q === 'string' ? questionIndex[q] : q;
+    if (question?._id) {
+      questionMap.set(question._id, { question, passage: null, section: null });
+    }
+  });
+
+  // Helper to convert correctAnswer label (A,B,C,D) to actual option value
+  const getCorrectAnswerDisplay = (question: any) => {
+    const correctAnswer = question?.correctAnswer ?? question?.answer;
+    if (!correctAnswer) {
+      // For matching-information type, use paragraphRef
+      if (question?.subType === 'matching-information' || question?.type === 'matching-information') {
+        return question?.paragraphRef ? `Paragraph ${question.paragraphRef}` : undefined;
+      }
+      return undefined;
+    }
+
+    // If question has options and correctAnswer is a single letter (A, B, C, D), convert to actual value
+    if (question?.options && Array.isArray(question.options) && /^[A-Z]$/.test(correctAnswer.trim())) {
+      const index = correctAnswer.trim().charCodeAt(0) - 65; // A=0, B=1, C=2, D=3
+      if (index >= 0 && index < question.options.length) {
+        return question.options[index];
+      }
+    }
+
+    // Otherwise return as-is
+    return correctAnswer;
+  };
+
   // Helpers for correctness
   const normalize = (v: any) => (v ?? '').toString().trim().toLowerCase();
   const computeCorrectness = (q: any, a: any) => {
-    const correct = q?.correctAnswer ?? q?.answer ?? (q?.type === 'matching-information' ? q?.paragraphRef : undefined);
-    if (correct == null) return false;
-    return normalize(a?.answer) === normalize(correct);
+    const correctDisplay = getCorrectAnswerDisplay(q);
+    if (correctDisplay == null) return false;
+    return normalize(a?.answer) === normalize(correctDisplay);
   };
 
   // Match answers with questions
@@ -262,11 +317,77 @@ export default function TestResultsPage() {
     questionsWithAnswers.push({ question, answer, passage, section, isCorrect });
   });
 
+  // Calculate total questions from test structure
+  let totalQuestionsInTest = 0;
+  
+  // Count questions from passages
+  (result.testId.passages || []).forEach((passage: any) => {
+    if (passage?.questionSections?.length) {
+      passage.questionSections.forEach((section: any) => {
+        totalQuestionsInTest += (section.questions || []).length;
+      });
+    }
+    if (passage?.sections?.length) {
+      passage.sections.forEach((section: any) => {
+        totalQuestionsInTest += (section.questions || []).length;
+      });
+    }
+  });
+  
+  // Count direct questions (not in passages)
+  totalQuestionsInTest += (result.testId.questions || []).length;
+
   // Calculate statistics
-  const totalQuestions = result.answers.length;
+  const totalQuestions = totalQuestionsInTest;
+  const answeredQuestions = result.answers.length;
+  const skippedQuestions = totalQuestions - answeredQuestions;
   const correctAnswers = questionsWithAnswers.filter(qa => qa.isCorrect).length;
   const totalTimeSpent = result.answers.reduce((acc, answer) => acc + answer.timeSpent, 0);
-  const averageTimePerQuestion = totalQuestions > 0 ? totalTimeSpent / totalQuestions : 0;
+  const averageTimePerQuestion = answeredQuestions > 0 ? totalTimeSpent / answeredQuestions : 0;
+
+  // Build complete question list for navigation
+  const allQuestionsForNav: Array<{ id: string; number: number; status: 'correct' | 'incorrect' | 'skipped' }> = [];
+  let questionNumber = 1;
+
+  // Add direct questions
+  (result.testId.questions || []).forEach((q: any) => {
+    const question = typeof q === 'string' ? questionIndexMap[q] : q;
+    if (!question) return;
+    const answer = result.answers.find(a => a.questionId === question._id);
+    const qa = questionsWithAnswers.find(qa => qa.question._id === question._id);
+    allQuestionsForNav.push({
+      id: question._id,
+      number: questionNumber++,
+      status: !answer ? 'skipped' : qa?.isCorrect ? 'correct' : 'incorrect'
+    });
+  });
+
+  // Add passage questions
+  (result.testId.passages || []).forEach((passage: any) => {
+    const sections = passage?.questionSections || passage?.sections || [];
+    sections.forEach((section: any) => {
+      (section.questions || []).forEach((q: any) => {
+        const question = typeof q === 'string' ? questionIndexMap[q] : q;
+        if (!question) return;
+        const qId = question._id || `${passage._id}-${section._id}-${question.number}`;
+        const answer = result.answers.find(a => a.questionId === qId);
+        const qa = questionsWithAnswers.find(qa => qa.question._id === qId || `${passage._id}-${section._id}-${question.number}` === qa.answer?.questionId);
+        allQuestionsForNav.push({
+          id: qId,
+          number: questionNumber++,
+          status: !answer ? 'skipped' : qa?.isCorrect ? 'correct' : 'incorrect'
+        });
+      });
+    });
+  });
+
+  const scrollToQuestion = (questionId: string, index: number) => {
+    setCurrentQuestionIndex(index);
+    const element = questionRefs[questionId];
+    if (element) {
+      element.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  };
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -295,11 +416,6 @@ export default function TestResultsPage() {
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="space-y-6">
-          <div>
-            <h2 className="text-3xl font-bold tracking-tight">Test Results</h2>
-            <p className="text-muted-foreground">Your performance summary and detailed feedback</p>
-          </div>
-
           {/* Score Overview */}
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
             <Card>
@@ -319,15 +435,16 @@ export default function TestResultsPage() {
 
             <Card>
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Correct Answers</CardTitle>
+                <CardTitle className="text-sm font-medium">Questions Status</CardTitle>
                 <Target className="h-4 w-4 text-muted-foreground" />
               </CardHeader>
               <CardContent>
                 <div className="text-3xl font-bold">
                   {correctAnswers}/{totalQuestions}
                 </div>
-                <div className="text-xs text-muted-foreground">
-                  {totalQuestions > 0 ? ((correctAnswers / totalQuestions) * 100).toFixed(0) : 0}% accuracy
+                <div className="text-xs text-muted-foreground space-y-0.5">
+                  <div>{answeredQuestions} answered • {skippedQuestions} skipped</div>
+                  <div>{totalQuestions > 0 ? ((correctAnswers / totalQuestions) * 100).toFixed(0) : 0}% accuracy</div>
                 </div>
               </CardContent>
             </Card>
@@ -393,18 +510,183 @@ export default function TestResultsPage() {
             </TabsList>
 
             <TabsContent value="questions" className="space-y-4">
-              <Card>
-                <CardHeader>
-                  <CardTitle>Question by Question Review</CardTitle>
-                  <CardDescription>
-                    Detailed breakdown of your answers and performance
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <ScrollArea className="h-[70vh]">
-                    <div className="space-y-6">
+              <div className="grid gap-6 lg:grid-cols-4">
+                {/* Main Content Area */}
+                <div className="lg:col-span-3">
+                  <Card>
+                    <CardHeader>
+                      <CardTitle>Question by Question Review</CardTitle>
+                      <CardDescription>
+                        Detailed breakdown of your answers and performance
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                      <ScrollArea className="h-[70vh]">
+                        <div className="space-y-6">
+                      {/* Direct Questions (no passages) - for listening/writing tests */}
+                      {result.testId.questions && result.testId.questions.length > 0 && (
+                        <div className="space-y-4">
+                          <div className="border-l-4 border-primary pl-4">
+                            <h3 className="text-lg font-semibold flex items-center gap-2">
+                              {getTypeIcon(result.testId.type)}
+                              {result.testId.title}
+                            </h3>
+                          </div>
+
+                          <div className="space-y-3">
+                            {result.testId.questions.map((q: any, qIndex: number) => {
+                              const question: any = typeof q === 'string' ? questionIndexMap[q] : q;
+                              if (!question) return null;
+                              
+                              const answer = result.answers.find(a => a.questionId === question._id);
+                              const questionWithAnswer = questionsWithAnswers.find(qa => qa.question._id === question._id);
+                              const isCorrect = questionWithAnswer?.isCorrect || false;
+                              const correctDisplay = getCorrectAnswerDisplay(question);
+
+                              return (
+                                <div 
+                                  key={question._id || qIndex} 
+                                  ref={(el) => { if (el) questionRefs[question._id] = el; }}
+                                  className="border rounded-lg p-4 space-y-4"
+                                >
+                                  <div className="flex items-start justify-between mb-3">
+                                    <div className="flex items-center gap-2 flex-wrap">
+                                      <span className="font-medium">Question {qIndex + 1}</span>
+                                      <Badge variant="outline" className="text-xs">
+                                        {(question.subType || question.type || '').replace(/-/g, ' ')}
+                                      </Badge>
+                                      {question.section && (
+                                        <Badge variant="outline" className="text-xs border-purple-300 text-purple-700">
+                                          Section {question.section}
+                                        </Badge>
+                                      )}
+                                      <Badge variant="outline" className="text-xs">
+                                        {question.points || 1} {question.points === 1 ? 'point' : 'points'}
+                                      </Badge>
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                      {isCorrect ? (
+                                        <CheckCircle className="h-5 w-5 text-green-600" />
+                                      ) : (
+                                        <XCircle className="h-5 w-5 text-red-600" />
+                                      )}
+                                      <span className="text-sm text-muted-foreground">
+                                        {formatTime(answer?.timeSpent || 0)}
+                                      </span>
+                                    </div>
+                                  </div>
+
+                                  {/* Audio Player for Listening Questions */}
+                                  {question.audioFile?.url && question.type === 'listening' && (
+                                    <div className="space-y-2">
+                                      <div className="flex items-center gap-2">
+                                        <Volume2 className="h-4 w-4 text-purple-600" />
+                                        <span className="text-sm font-medium">Audio</span>
+                                      </div>
+                                      <AudioPlayer
+                                        src={question.audioFile.url}
+                                        title={question.audioFile.originalName || 'Question Audio'}
+                                        showDownload={false}
+                                        className="w-full"
+                                      />
+                                    </div>
+                                  )}
+
+                                  {/* Image for Questions with imageFile */}
+                                  {question.imageFile?.url && (
+                                    <div className="space-y-2">
+                                      <span className="text-sm font-medium">Reference Image</span>
+                                      <div className="rounded-lg border border-slate-200 overflow-hidden bg-slate-50">
+                                        <img
+                                          src={question.imageFile.url}
+                                          alt={question.imageFile.originalName || 'Question image'}
+                                          className="w-full h-auto max-h-96 object-contain"
+                                        />
+                                      </div>
+                                    </div>
+                                  )}
+
+                                  <div className="space-y-3">
+                                    <div>
+                                      <p className="font-medium text-sm mb-2">Question:</p>
+                                      <p className="text-sm">{question.question || question.prompt}</p>
+                                      {question.instructionText && (
+                                        <p className="text-xs text-muted-foreground mt-1 italic">{question.instructionText}</p>
+                                      )}
+                                      {question.wordLimit && (
+                                        <Badge variant="outline" className="mt-2 text-xs border-blue-300 text-blue-700">
+                                          Word limit: {question.wordLimit}
+                                        </Badge>
+                                      )}
+                                    </div>
+
+                                    {/* Options for Multiple Choice */}
+                                    {question.options && question.options.length > 0 && (
+                                      <div>
+                                        <p className="font-medium text-sm mb-1">Options:</p>
+                                        <div className="space-y-1">
+                                          {question.options.map((option: string, idx: number) => (
+                                            <div
+                                              key={idx}
+                                              className={`p-2 rounded text-sm border ${
+                                                option === answer?.answer && option === correctDisplay
+                                                  ? 'bg-green-50 border-green-300 text-green-800'
+                                                  : option === answer?.answer
+                                                  ? 'bg-red-50 border-red-300 text-red-800'
+                                                  : option === correctDisplay
+                                                  ? 'bg-green-50 border-green-300 text-green-800'
+                                                  : 'bg-white border-slate-200'
+                                              }`}
+                                            >
+                                              <span className="font-medium mr-2">{String.fromCharCode(65 + idx)}.</span>
+                                              {option}
+                                              {option === correctDisplay && (
+                                                <span className="ml-2 text-green-600 font-medium">✓ Correct</span>
+                                              )}
+                                            </div>
+                                          ))}
+                                        </div>
+                                      </div>
+                                    )}
+
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                      <div>
+                                        <p className="font-medium text-sm mb-1">Your Answer:</p>
+                                        <div className={`p-2 rounded text-sm ${
+                                          isCorrect
+                                            ? 'bg-green-50 text-green-800 border border-green-200'
+                                            : 'bg-red-50 text-red-800 border border-red-200'
+                                        }`}>
+                                          {answer?.answer || 'No answer provided'}
+                                        </div>
+                                      </div>
+
+                                      {correctDisplay && (
+                                        <div>
+                                          <p className="font-medium text-sm mb-1">Correct Answer:</p>
+                                          <div className="p-2 rounded text-sm bg-green-50 text-green-800 border border-green-200">
+                                            {correctDisplay}
+                                          </div>
+                                        </div>
+                                      )}
+                                    </div>
+
+                                    <div className="flex justify-between text-xs text-muted-foreground pt-2 border-t">
+                                      <span>Status: <span className={isCorrect ? 'text-green-600 font-medium' : 'text-red-600 font-medium'}>
+                                        {isCorrect ? 'Correct ✓' : 'Incorrect ✗'}
+                                      </span></span>
+                                      <span>Time spent: {formatTime(answer?.timeSpent || 0)}</span>
+                                    </div>
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      )}
+
                       {/* Group by passage */}
-                      {result.testId.passages.map((passage, passageIndex) => (
+                      {result.testId.passages && result.testId.passages.length > 0 && result.testId.passages.map((passage, passageIndex) => (
                         <div key={passage._id} className="space-y-4">
                           {/* Passage Header */}
                           <div className="border-l-4 border-primary pl-4">
@@ -445,10 +727,15 @@ export default function TestResultsPage() {
                                 const answer = result.answers.find(a => a.questionId === question._id || a.questionId === `${passage._id}-${section._id}-${question.number}`);
                                 const questionWithAnswer = questionsWithAnswers.find(qa => qa.question._id === question._id || `${passage._id}-${section._id}-${question.number}` === (qa.answer?.questionId));
                                 const isCorrect = questionWithAnswer?.isCorrect || false;
-                                const correctDisplay = question.correctAnswer || question.answer || (question.subType === 'matching-information' || question.type === 'matching-information' ? `Paragraph ${question.paragraphRef}` : undefined);
+                                const correctDisplay = getCorrectAnswerDisplay(question);
+                                const qId = question._id || `${passage._id}-${section._id}-${question.number}`;
 
                                 return (
-                                  <div key={question._id} className="ml-4 border rounded-lg p-4">
+                                  <div 
+                                    key={qId}
+                                    ref={(el) => { if (el) questionRefs[qId] = el; }}
+                                    className="ml-4 border rounded-lg p-4"
+                                  >
                                     <div className="flex items-start justify-between mb-3">
                                       <div className="flex items-center gap-2">
                                         <span className="font-medium">Question {question.number || question.questionNumber}</span>
@@ -478,6 +765,35 @@ export default function TestResultsPage() {
                                         <p className="font-medium text-sm mb-2">Question:</p>
                                         <p className="text-sm">{question.prompt || question.question}</p>
                                       </div>
+
+                                      {/* Options for Multiple Choice */}
+                                      {question.options && question.options.length > 0 && (
+                                        <div>
+                                          <p className="font-medium text-sm mb-1">Options:</p>
+                                          <div className="space-y-1">
+                                            {question.options.map((option: string, idx: number) => (
+                                              <div
+                                                key={idx}
+                                                className={`p-2 rounded text-sm border ${
+                                                  option === answer?.answer && option === correctDisplay
+                                                    ? 'bg-green-50 border-green-300 text-green-800'
+                                                    : option === answer?.answer
+                                                    ? 'bg-red-50 border-red-300 text-red-800'
+                                                    : option === correctDisplay
+                                                    ? 'bg-green-50 border-green-300 text-green-800'
+                                                    : 'bg-white border-slate-200'
+                                                }`}
+                                              >
+                                                <span className="font-medium mr-2">{String.fromCharCode(65 + idx)}.</span>
+                                                {option}
+                                                {option === correctDisplay && (
+                                                  <span className="ml-2 text-green-600 font-medium">✓ Correct</span>
+                                                )}
+                                              </div>
+                                            ))}
+                                          </div>
+                                        </div>
+                                      )}
 
                                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                         <div>
@@ -512,10 +828,63 @@ export default function TestResultsPage() {
                           ))}
                         </div>
                       ))}
-                    </div>
-                  </ScrollArea>
-                </CardContent>
-              </Card>
+                        </div>
+                      </ScrollArea>
+                    </CardContent>
+                  </Card>
+                </div>
+
+                {/* Question Navigation Sidebar */}
+                <div className="lg:col-span-1">
+                  <Card className="border-slate-200 shadow-sm sticky top-6">
+                    <CardHeader className="border-b border-slate-100 bg-slate-50/50 py-3">
+                      <CardTitle className="text-slate-900 text-base">Questions</CardTitle>
+                    </CardHeader>
+                    <CardContent className="pt-4 pb-4">
+                      <ScrollArea className="h-[320px] pr-3">
+                        <div className="grid grid-cols-5 gap-1.5">
+                          {allQuestionsForNav.map((q, index) => {
+                            const isCurrent = currentQuestionIndex === index;
+                            return (
+                              <Button
+                                key={q.id}
+                                variant={isCurrent ? "default" : "outline"}
+                                size="sm"
+                                className={`h-8 w-8 p-0 text-xs font-semibold transition-all ${
+                                  isCurrent
+                                    ? 'bg-[#004875] hover:bg-[#003a5c] text-white border-[#004875] shadow-md'
+                                    : q.status === 'correct'
+                                    ? 'bg-green-50 border-green-400 text-green-700 hover:bg-green-100'
+                                    : q.status === 'incorrect'
+                                    ? 'bg-red-50 border-red-400 text-red-700 hover:bg-red-100'
+                                    : 'bg-slate-50 border-slate-300 text-slate-500 hover:bg-slate-100'
+                                }`}
+                                onClick={() => scrollToQuestion(q.id, index)}
+                              >
+                                {q.number}
+                              </Button>
+                            );
+                          })}
+                        </div>
+                      </ScrollArea>
+                      <div className="mt-3 pt-3 border-t border-slate-100 space-y-1.5">
+                        <div className="flex items-center gap-1.5 text-[10px] text-slate-600">
+                          <div className="w-3 h-3 bg-green-50 border-2 border-green-400 rounded"></div>
+                          <span className="font-medium">Correct ({allQuestionsForNav.filter(q => q.status === 'correct').length})</span>
+                        </div>
+                        <div className="flex items-center gap-1.5 text-[10px] text-slate-600">
+                          <div className="w-3 h-3 bg-red-50 border-2 border-red-400 rounded"></div>
+                          <span className="font-medium">Incorrect ({allQuestionsForNav.filter(q => q.status === 'incorrect').length})</span>
+                        </div>
+                        <div className="flex items-center gap-1.5 text-[10px] text-slate-600">
+                          <div className="w-3 h-3 bg-slate-50 border-2 border-slate-300 rounded"></div>
+                          <span className="font-medium">Skipped ({allQuestionsForNav.filter(q => q.status === 'skipped').length})</span>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                </div>
+              </div>
             </TabsContent>
 
             <TabsContent value="feedback" className="space-y-4">

@@ -46,6 +46,23 @@ interface Question {
   prompt?: string;
   passage?: string;
   audioUrl?: string;
+  audioFile?: {
+    url: string;
+    publicId?: string;
+    originalName?: string;
+    format?: string;
+    bytes?: number;
+    duration?: number;
+  };
+  imageFile?: {
+    url: string;
+    publicId?: string;
+    originalName?: string;
+    format?: string;
+    bytes?: number;
+    width?: number;
+    height?: number;
+  };
   options?: string[];
   points: number;
   answer?: string;
@@ -57,6 +74,10 @@ interface Question {
   sectionName?: string;
   sectionInstructions?: string;
   paragraphRef?: string;
+  section?: number;
+  instructionText?: string;
+  wordLimit?: number;
+  blanksCount?: number;
 }
 
 interface Passage {
@@ -526,39 +547,68 @@ export default function TakeTestPage() {
   const answeredCount = Object.keys(answers).length;
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
       {/* Header */}
-      <div className="bg-white border-b sticky top-0 z-50">
+      <div className="bg-white border-b border-slate-200 shadow-sm sticky top-0 z-50 backdrop-blur-sm bg-white/95">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-16">
-            <div className="flex items-center gap-4">
-              <div className="flex items-center gap-2">
-                {getTypeIcon(test.type)}
-                <div>
-                  <h2 className="text-lg font-semibold">{test.title}</h2>
-                  <p className="text-sm text-muted-foreground">{test.description}</p>
+            <div className="flex items-center gap-3">
+              <div className="flex h-12 w-12 items-center justify-center rounded-full bg-white shadow-md overflow-hidden flex-shrink-0">
+                <img
+                  src="/BHV-logo-page.jpg"
+                  alt="BHV English Logo"
+                  className="h-full w-full object-cover"
+                  onError={(e) => {
+                    const target = e.currentTarget as HTMLImageElement;
+                    target.src = '/logo.svg';
+                  }}
+                />
+              </div>
+              <div className="border-l border-slate-300 pl-3 hidden sm:block">
+                <div className="flex items-center gap-2">
+                  <div className={`flex h-6 w-6 items-center justify-center rounded-lg ${test.type === 'reading' ? 'bg-blue-100 text-blue-600' :
+                      test.type === 'listening' ? 'bg-purple-100 text-purple-600' :
+                        test.type === 'writing' ? 'bg-green-100 text-green-600' :
+                          'bg-slate-100 text-slate-600'
+                    }`}>
+                    {getTypeIcon(test.type)}
+                  </div>
+                  <div>
+                    <h2 className="text-sm font-bold text-slate-900 leading-tight">{test.title}</h2>
+                    <p className="text-[10px] text-slate-500 leading-tight">{test.description}</p>
+                  </div>
                 </div>
               </div>
             </div>
 
-            <div className="flex items-center gap-4">
-              <Button variant="outline" onClick={() => router.push('/submissions')}>
-                <Home className="h-4 w-4 mr-2" />
-                Back to Tests
+            <div className="flex items-center gap-2 sm:gap-3">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => router.push('/submissions')}
+                className="gap-2 hover:bg-slate-100 text-slate-700"
+              >
+                <Home className="h-4 w-4" />
+                <span className="hidden sm:inline">Back</span>
               </Button>
-              <div className="text-right">
-                <div className="flex items-center gap-2">
-                  <Clock className="h-4 w-4" />
-                  <span className={`font-mono text-lg ${timeRemaining < 300 ? 'text-red-600' : ''}`}>
+              <div className={`flex items-center gap-2 px-3 py-2 rounded-lg transition-colors ${timeRemaining < 300
+                  ? 'border-2 border-red-300'
+                  : ''
+                }`}>
+                <Clock className={`h-4 w-4 sm:h-5 sm:w-5 ${timeRemaining < 300 ? 'text-red-600 animate-pulse' : 'text-[#004875]'
+                  }`} />
+                <div className="text-right">
+                  <div className={`font-mono text-base sm:text-lg font-bold leading-tight ${timeRemaining < 300 ? 'text-red-600' : 'text-[#004875]'
+                    }`}>
                     {formatTime(timeRemaining)}
-                  </span>
-                </div>
-                {timeRemaining < 300 && (
-                  <div className="text-xs text-red-600 flex items-center gap-1">
-                    <AlertTriangle className="h-3 w-3" />
-                    Time running out!
                   </div>
-                )}
+                  {timeRemaining < 300 && (
+                    <div className="text-[10px] text-red-600 flex items-center justify-end gap-1 leading-tight">
+                      <AlertTriangle className="h-2.5 w-2.5" />
+                      <span className="hidden sm:inline">Hurry up!</span>
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
           </div>
@@ -567,35 +617,46 @@ export default function TakeTestPage() {
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
         {/* Progress */}
-        <Card className="mb-6">
+        <Card className="mb-6 border-slate-200 shadow-sm">
           <CardContent className="pt-6">
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-sm font-medium">
-                Question {currentQuestionIndex + 1} of {allQuestions.length}
-              </span>
-              <span className="text-sm text-muted-foreground">
-                {answeredCount} answered
-              </span>
+            <div className="flex items-center justify-between mb-3">
+              <div className="flex items-center gap-2">
+                <span className="text-sm font-semibold text-slate-900">
+                  Question {currentQuestionIndex + 1}
+                </span>
+                <span className="text-sm text-slate-500">
+                  of {allQuestions.length}
+                </span>
+              </div>
+              <Badge variant="secondary" className="bg-[#004875] text-white hover:bg-[#003a5c]">
+                {answeredCount}/{allQuestions.length} Answered
+              </Badge>
             </div>
-            <Progress value={progress} className="h-2" />
+            <Progress value={progress} className="h-2.5" />
           </CardContent>
         </Card>
 
-        <div className="grid gap-6 lg:grid-cols-4">
-          {/* Question Content */}
-          <div className="lg:col-span-3">
+        <div className="grid gap-6 lg:grid-cols-4 lg:h-[calc(100vh-12rem)]">
+          {/* Question Content - Scrollable Area */}
+          <div className="lg:col-span-3 lg:overflow-y-auto lg:pr-2 space-y-6 lg:h-full lg:scrollbar-thin">
             {/* Passage Card */}
             {currentPassage && (
-              <Card className="mb-6">
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    {getTypeIcon(currentPassage.type)}
-                    <span>{currentPassage.title}</span>
-                    <Badge variant="secondary">{currentPassage.type}</Badge>
+              <Card className="mb-6 border-slate-200 shadow-sm">
+                <CardHeader className="border-b border-slate-100 bg-slate-50/50">
+                  <CardTitle className="flex items-center gap-3">
+                    <div className={`h-8 w-8 rounded-lg flex items-center justify-center ${currentPassage.type === 'reading' ? 'bg-blue-100' :
+                        currentPassage.type === 'listening' ? 'bg-purple-100' : 'bg-slate-100'
+                      }`}>
+                      {getTypeIcon(currentPassage.type)}
+                    </div>
+                    <span className="text-slate-900">{currentPassage.title}</span>
+                    <Badge variant="secondary" className="capitalize bg-[#004875] text-white">
+                      {currentPassage.type}
+                    </Badge>
                   </CardTitle>
                 </CardHeader>
-                <CardContent>
-                  <ScrollArea className="max-h-80 pr-4">
+                <CardContent className="pt-6">
+                  <ScrollArea className="max-h-[60vh] lg:max-h-[500px] pr-4">
                     <div className="space-y-4">
                       {/* Audio for listening passages */}
                       {currentPassage.audioUrl && (
@@ -617,13 +678,11 @@ export default function TakeTestPage() {
                       )}
 
                       {/* Passage content */}
-                      <div className="space-y-2">
-                        <Label className="text-sm font-medium">Passage</Label>
-                        <div className="p-4 bg-muted rounded-lg">
-                          <p className="text-sm leading-relaxed whitespace-pre-wrap">
-                            {currentPassage.content}
-                          </p>
-                        </div>
+                      <div className="space-y-3">
+                        <Label className="text-sm font-semibold text-slate-700">Passage</Label>
+                        <p className="text-sm leading-relaxed whitespace-pre-wrap text-slate-900">
+                          {currentPassage.content}
+                        </p>
                       </div>
                     </div>
                   </ScrollArea>
@@ -632,30 +691,32 @@ export default function TakeTestPage() {
             )}
 
             {/* Question Card */}
-            <Card>
-              <CardHeader>
-                <div className="flex items-center justify-between">
-                  <CardTitle className="flex items-center gap-2">
-                    <Badge variant="outline">
+            <Card className="border-slate-200 shadow-sm">
+              <CardHeader className="border-b border-slate-100 bg-slate-50/50">
+                <div className="flex items-center justify-between flex-wrap gap-3">
+                  <CardTitle className="flex items-center gap-2 text-slate-900">
+                    <Badge variant="outline" className="border-[#004875] text-[#004875] font-semibold px-3">
                       Q{currentQuestion?.number || (currentQuestionIndex + 1)}
                     </Badge>
-                    <Badge variant="secondary">{(currentQuestion?.subType || currentQuestion?.type).replace('-', ' ')}</Badge>
-                    <span>{currentQuestion?.points || 1} point{(currentQuestion?.points || 1) > 1 ? 's' : ''}</span>
+                    <Badge variant="secondary" className="capitalize bg-slate-200 text-slate-700 font-medium">
+                      {(currentQuestion?.subType || currentQuestion?.type).replace('-', ' ')}
+                    </Badge>
+                    <span className="text-sm text-slate-600 font-normal">
+                      {currentQuestion?.points || 1} point{(currentQuestion?.points || 1) > 1 ? 's' : ''}
+                    </span>
                   </CardTitle>
-                  {currentQuestion?.sectionName && (
-                    <div className="flex items-center gap-2">
-                      <Badge variant="outline">{currentQuestion.sectionName}</Badge>
-                    </div>
-                  )}
-                  {saving && (
-                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                      <Save className="h-4 w-4 animate-pulse" />
-                      Saving...
-                    </div>
-                  )}
+                  <div className="flex items-center gap-2">
+                    
+                    {saving && (
+                      <div className="flex items-center gap-1.5 text-sm text-slate-500">
+                        <Save className="h-4 w-4 animate-pulse text-[#004875]" />
+                        Saving...
+                      </div>
+                    )}
+                  </div>
                 </div>
                 {currentQuestion?.sectionInstructions && (
-                  <CardDescription className="text-sm text-muted-foreground">
+                  <CardDescription className="text-sm text-slate-600 mt-2 leading-relaxed">
                     {currentQuestion.sectionInstructions}
                   </CardDescription>
                 )}
@@ -666,9 +727,62 @@ export default function TakeTestPage() {
 
                     {/* Question */}
                     <div className="space-y-4">
-                      <Label className="text-base font-medium">
-                        {currentQuestion?.question || currentQuestion?.prompt}
-                      </Label>
+                      {/* Audio Player for Listening Questions */}
+                      {currentQuestion?.type === 'listening' && currentQuestion?.audioFile?.url && (
+                        <div className="mb-6">
+                          <div className="flex items-center gap-2 mb-3">
+                            <Volume2 className="h-5 w-5 text-purple-600" />
+                            <Label className="text-sm font-semibold text-slate-700">
+                              Listen to the audio
+                            </Label>
+                            {currentQuestion?.section && (
+                              <Badge variant="outline" className="ml-2 border-purple-300 text-purple-700">
+                                Section {currentQuestion.section}
+                              </Badge>
+                            )}
+                          </div>
+                          <AudioPlayer
+                            src={currentQuestion.audioFile.url}
+                            title={currentQuestion.audioFile.originalName || `Question ${currentQuestionIndex + 1} Audio`}
+                            showDownload={false}
+                            className="w-full"
+                          />
+                        </div>
+                      )}
+
+                      {/* Image for Questions with imageFile */}
+                      {currentQuestion?.imageFile?.url && (
+                        <div className="mb-6">
+                          <div className="flex items-center gap-2 mb-3">
+                            <Label className="text-sm font-semibold text-slate-700">
+                              Reference Image
+                            </Label>
+                          </div>
+                          <div className="rounded-lg border border-slate-200 overflow-hidden bg-slate-50">
+                            <img
+                              src={currentQuestion.imageFile.url}
+                              alt={currentQuestion.imageFile.originalName || 'Question image'}
+                              className="w-full h-auto max-h-96 object-contain"
+                            />
+                          </div>
+                        </div>
+                      )}
+
+                      <div className="pb-2 border-b border-slate-200">
+                        <Label className="text-base font-semibold text-slate-900 leading-relaxed">
+                          {currentQuestion?.question || currentQuestion?.prompt}
+                        </Label>
+                        {currentQuestion?.instructionText && (
+                          <p className="text-sm text-slate-600 mt-2 italic">
+                            {currentQuestion.instructionText}
+                          </p>
+                        )}
+                        {currentQuestion?.wordLimit && (
+                          <Badge variant="outline" className="mt-2 border-blue-300 text-blue-700">
+                            Word limit: {currentQuestion.wordLimit} words
+                          </Badge>
+                        )}
+                      </div>
 
                       {/* Audio Player for Individual Question */}
                       {currentQuestion?.audioUrl && currentQuestion?.type === 'listening' && (
@@ -690,9 +804,13 @@ export default function TakeTestPage() {
                       )}
 
                       {currentQuestion?.paragraphRef && (
-                        <div className="text-sm text-muted-foreground">
-                          <Badge variant="outline" className="mr-2">Paragraph {currentQuestion.paragraphRef}</Badge>
-                          Refer to paragraph {currentQuestion.paragraphRef} in the passage above.
+                        <div className="flex items-start gap-2 p-3 bg-blue-50 rounded-lg border border-blue-200">
+                          <Badge variant="outline" className="border-blue-400 text-blue-700 font-semibold">
+                            Paragraph {currentQuestion.paragraphRef}
+                          </Badge>
+                          <span className="text-sm text-blue-700">
+                            Refer to paragraph {currentQuestion.paragraphRef} in the passage above.
+                          </span>
                         </div>
                       )}
 
@@ -701,51 +819,53 @@ export default function TakeTestPage() {
                         <RadioGroup
                           value={answers[currentAnswerKey] || ''}
                           onValueChange={(value) => handleSelectAnswer(currentQuestion, currentQuestionIndex, value)}
+                          className="space-y-2 pt-2"
                         >
                           {currentQuestion?.subType === 'true-false-not-given' ? (
                             <>
-                              <div className="flex items-center space-x-2">
+                              <div className="flex items-center space-x-3 py-2">
                                 <RadioGroupItem value="True" id={`tf-${currentQuestionIndex}-true`} />
-                                <Label htmlFor={`tf-${currentQuestionIndex}-true`} className="cursor-pointer">True</Label>
+                                <Label htmlFor={`tf-${currentQuestionIndex}-true`} className="cursor-pointer font-medium flex-1">True</Label>
                               </div>
-                              <div className="flex items-center space-x-2">
+                              <div className="flex items-center space-x-3 py-2">
                                 <RadioGroupItem value="False" id={`tf-${currentQuestionIndex}-false`} />
-                                <Label htmlFor={`tf-${currentQuestionIndex}-false`} className="cursor-pointer">False</Label>
+                                <Label htmlFor={`tf-${currentQuestionIndex}-false`} className="cursor-pointer font-medium flex-1">False</Label>
                               </div>
-                              <div className="flex items-center space-x-2">
+                              <div className="flex items-center space-x-3 py-2">
                                 <RadioGroupItem value="Not Given" id={`tf-${currentQuestionIndex}-not-given`} />
-                                <Label htmlFor={`tf-${currentQuestionIndex}-not-given`} className="cursor-pointer">Not Given</Label>
+                                <Label htmlFor={`tf-${currentQuestionIndex}-not-given`} className="cursor-pointer font-medium flex-1">Not Given</Label>
                               </div>
                             </>
                           ) : (
                             <>
-                              <div className="flex items-center space-x-2">
+                              <div className="flex items-center space-x-3 py-2">
                                 <RadioGroupItem value="yes" id={`yn-${currentQuestionIndex}-yes`} />
-                                <Label htmlFor={`yn-${currentQuestionIndex}-yes`} className="cursor-pointer">Yes</Label>
+                                <Label htmlFor={`yn-${currentQuestionIndex}-yes`} className="cursor-pointer font-medium flex-1">Yes</Label>
                               </div>
-                              <div className="flex items-center space-x-2">
+                              <div className="flex items-center space-x-3 py-2">
                                 <RadioGroupItem value="no" id={`yn-${currentQuestionIndex}-no`} />
-                                <Label htmlFor={`yn-${currentQuestionIndex}-no`} className="cursor-pointer">No</Label>
+                                <Label htmlFor={`yn-${currentQuestionIndex}-no`} className="cursor-pointer font-medium flex-1">No</Label>
                               </div>
-                              <div className="flex items-center space-x-2">
+                              <div className="flex items-center space-x-3 py-2">
                                 <RadioGroupItem value="not given" id={`yn-${currentQuestionIndex}-notgiven`} />
-                                <Label htmlFor={`yn-${currentQuestionIndex}-notgiven`} className="cursor-pointer">Not Given</Label>
+                                <Label htmlFor={`yn-${currentQuestionIndex}-notgiven`} className="cursor-pointer font-medium flex-1">Not Given</Label>
                               </div>
                             </>
                           )}
                         </RadioGroup>
                       )}
 
-                      {/* Multiple Choice */}
-                      {currentQuestion?.subType === 'multiple-choice' && currentQuestion?.options && (
+                      {/* Multiple Choice (Reading and Listening) */}
+                      {(currentQuestion?.subType === 'multiple-choice' || currentQuestion?.subType === 'listening-multiple-choice') && currentQuestion?.options && (
                         <RadioGroup
                           value={answers[currentAnswerKey] || ''}
                           onValueChange={(value) => handleSelectAnswer(currentQuestion, currentQuestionIndex, value)}
+                          className="space-y-2 pt-2"
                         >
                           {currentQuestion?.options?.map((option, index) => (
-                            <div key={index} className="flex items-center space-x-2">
+                            <div key={index} className="flex items-center space-x-3 py-2">
                               <RadioGroupItem value={option} id={`option-${currentQuestionIndex}-${index}`} />
-                              <Label htmlFor={`option-${currentQuestionIndex}-${index}`} className="cursor-pointer">
+                              <Label htmlFor={`option-${currentQuestionIndex}-${index}`} className="cursor-pointer font-medium flex-1 leading-relaxed">
                                 {option}
                               </Label>
                             </div>
@@ -801,129 +921,164 @@ export default function TakeTestPage() {
                         </>
                       )}
 
-                      {/* Sentence Completion / Summary Completion / Short Answer */}
+                      {/* Sentence Completion / Summary Completion / Short Answer / Listening Completion Types */}
                       {(currentQuestion?.subType === 'sentence-completion' ||
                         currentQuestion?.subType === 'summary-completion' ||
                         currentQuestion?.subType === 'short-answer' ||
                         currentQuestion?.subType === 'fill-blank' ||
-                        currentQuestion?.subType === 'diagram-completion') && (
+                        currentQuestion?.subType === 'diagram-completion' ||
+                        currentQuestion?.subType === 'form-completion' ||
+                        currentQuestion?.subType === 'note-completion' ||
+                        currentQuestion?.subType === 'table-completion' ||
+                        currentQuestion?.subType === 'flowchart-completion' ||
+                        currentQuestion?.subType === 'diagram-labelling' ||
+                        currentQuestion?.subType === 'map-labelling' ||
+                        currentQuestion?.subType === 'plan-labelling' ||
+                        currentQuestion?.subType === 'listening-short-answer' ||
+                        currentQuestion?.subType === 'listening-matching' ||
+                        currentQuestion?.subType === 'pick-from-list') && (
                           <Input
-                            placeholder="Enter your answer..."
+                            placeholder="Type your answer here..."
                             value={answers[currentAnswerKey] || ''}
                             onChange={(e) => handleLocalInputChange(currentQuestion, currentQuestionIndex, e.target.value)}
                             onBlur={() => handleLocalInputCommit(currentQuestion, currentQuestionIndex)}
+                            className="border-slate-300 focus:border-[#004875] focus:ring-[#004875] text-base py-5"
                           />
                         )}
 
-                      {/* Writing tasks (legacy support) */}
-                      {(currentQuestion?.subType === 'task1' || currentQuestion?.subType === 'task2') && (
-                        <Textarea
-                          placeholder="Write your response here..."
-                          rows={10}
-                          value={answers[currentAnswerKey] || ''}
-                          onChange={(e) => handleSelectAnswer(currentQuestion, currentQuestionIndex, e.target.value)}
-                        />
+                      {/* Writing tasks */}
+                      {(currentQuestion?.subType === 'task1' || currentQuestion?.subType === 'task2' || currentQuestion?.subType === 'essay') && (
+                        <div className="space-y-3">
+                          {currentQuestion?.wordLimit && (
+                            <div className="flex items-center justify-between text-sm">
+                              <span className="text-slate-600">Word limit: {currentQuestion.wordLimit} words</span>
+                              <span className="text-slate-500">
+                                Current: {(answers[currentAnswerKey] || '').split(/\s+/).filter(Boolean).length} words
+                              </span>
+                            </div>
+                          )}
+                          <Textarea
+                            placeholder="Write your response here..."
+                            rows={12}
+                            value={answers[currentAnswerKey] || ''}
+                            onChange={(e) => handleSelectAnswer(currentQuestion, currentQuestionIndex, e.target.value)}
+                            className="border-slate-300 focus:border-[#004875] focus:ring-[#004875] text-base leading-relaxed resize-none"
+                          />
+                        </div>
                       )}
                     </div>
                   </div>
                 </ScrollArea>
               </CardContent>
-            </Card>
-          </div>
 
-          {/* Navigation & Summary */}
-          <div className="space-y-6">
-            {/* Navigation */}
-            <Card>
-              <CardHeader>
-                <CardTitle>Navigation</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="flex gap-2">
+              {/* Navigation - Moved here for better UX */}
+              <CardContent className="border-t border-slate-100 bg-slate-50/30 py-4">
+                <div className="flex items-center gap-3">
                   <Button
                     variant="outline"
                     onClick={handlePreviousQuestion}
                     disabled={currentQuestionIndex === 0}
-                    className="flex-1"
+                    className="flex-1 border-slate-300 hover:bg-slate-100 disabled:opacity-40"
                   >
-                    <ArrowLeft className="h-4 w-4 mr-1" />
+                    <ArrowLeft className="h-4 w-4 mr-2" />
                     Previous
                   </Button>
                   <Button
                     variant="outline"
                     onClick={handleNextQuestion}
                     disabled={currentQuestionIndex === allQuestions.length - 1}
-                    className="flex-1"
+                    className="flex-1 border-slate-300 hover:bg-slate-100 disabled:opacity-40"
                   >
                     Next
-                    <ArrowRight className="h-4 w-4 ml-1" />
+                    <ArrowRight className="h-4 w-4 ml-2" />
                   </Button>
                 </div>
+              </CardContent>
+            </Card>
+          </div>
 
+          {/* Question Overview Sidebar - Fixed Position on Desktop */}
+          <div className="lg:col-span-1 lg:h-full lg:overflow-hidden flex flex-col gap-4">
+            {/* Questions Grid */}
+            <Card className="border-slate-200 shadow-sm">
+              <CardHeader className="border-b border-slate-100 bg-slate-50/50 py-3">
+                <CardTitle className="text-slate-900 text-base">Questions</CardTitle>
+              </CardHeader>
+              <CardContent className="pt-4 pb-4">
+                <ScrollArea className="h-[280px] lg:h-[320px] pr-3">
+                  <div className="grid grid-cols-5 gap-1.5">
+                    {allQuestions?.map((question, index) => {
+                      const isAnswered = !!answers[getAnswerKey(question, index)];
+                      const isCurrent = currentQuestionIndex === index;
+
+                      return (
+                        <Button
+                          key={index}
+                          variant={isCurrent ? "default" : "outline"}
+                          size="sm"
+                          className={`h-8 w-8 p-0 text-xs font-semibold transition-all ${isCurrent
+                              ? 'bg-[#004875] hover:bg-[#003a5c] text-white border-[#004875] shadow-md'
+                              : isAnswered
+                                ? 'bg-green-50 border-green-400 text-green-700 hover:bg-green-100'
+                                : 'border-slate-300 hover:bg-slate-100 hover:border-slate-400'
+                            }`}
+                          onClick={() => {
+                            setCurrentQuestionIndex(index);
+                            updateCurrentPassage(index);
+                            setQuestionStartTime(Date.now());
+                          }}
+                        >
+                          {index + 1}
+                        </Button>
+                      );
+                    })}
+                  </div>
+                </ScrollArea>
+                <div className="mt-3 pt-3 border-t border-slate-100 space-y-1.5">
+                  <div className="flex items-center gap-1.5 text-[10px] text-slate-600">
+                    <div className="w-3 h-3 bg-[#004875] rounded shadow-sm"></div>
+                    <span className="font-medium">Current</span>
+                  </div>
+                  <div className="flex items-center gap-1.5 text-[10px] text-slate-600">
+                    <div className="w-3 h-3 bg-green-50 border-2 border-green-400 rounded"></div>
+                    <span className="font-medium">Answered</span>
+                  </div>
+                  <div className="flex items-center gap-1.5 text-[10px] text-slate-600">
+                    <div className="w-3 h-3 bg-white border-2 border-slate-300 rounded"></div>
+                    <span className="font-medium">Unanswered</span>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Submit Button - Prominent Position */}
+            <Card className="border-slate-200 shadow-lg">
+              <CardContent className="p-4">
                 <AlertDialog>
                   <AlertDialogTrigger asChild>
-                    <Button className="w-full" variant="default">
-                      <Send className="h-4 w-4 mr-2" />
+                    <Button
+                      className="w-full bg-gradient-to-r from-[#004875] to-[#003a5c] hover:from-[#003a5c] hover:to-[#002a3c] text-white shadow-md font-semibold py-6 text-base"
+                    >
+                      <Send className="h-5 w-5 mr-2" />
                       Submit Test
                     </Button>
                   </AlertDialogTrigger>
-                  <AlertDialogContent>
+                  <AlertDialogContent className="border-slate-200">
                     <AlertDialogHeader>
-                      <AlertDialogTitle>Submit Test</AlertDialogTitle>
-                      <AlertDialogDescription>
+                      <AlertDialogTitle className="text-slate-900">Submit Test</AlertDialogTitle>
+                      <AlertDialogDescription className="text-slate-600">
                         Are you sure you want to submit your test? You have answered {answeredCount} out of {allQuestions.length} questions.
                         This action cannot be undone.
                       </AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter>
-                      <AlertDialogCancel>Cancel</AlertDialogCancel>
-                      <AlertDialogAction onClick={handleSubmitTest}>
+                      <AlertDialogCancel className="border-slate-300">Cancel</AlertDialogCancel>
+                      <AlertDialogAction onClick={handleSubmitTest} className="bg-[#004875] hover:bg-[#003a5c]">
                         Submit Test
                       </AlertDialogAction>
                     </AlertDialogFooter>
                   </AlertDialogContent>
                 </AlertDialog>
-              </CardContent>
-            </Card>
-
-            {/* Question Overview */}
-            <Card>
-              <CardHeader>
-                <CardTitle>Question Overview</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <ScrollArea className="h-64">
-                  <div className="grid grid-cols-5 gap-2">
-                    {allQuestions?.map((question, index) => (
-                      <Button
-                        key={index}
-                        variant={currentQuestionIndex === index ? "default" : "outline"}
-                        size="sm"
-                        className={`h-8 w-8 p-0 ${answers[getAnswerKey(question, index)]
-                          ? 'bg-green-100 border-green-300 text-green-800 hover:bg-green-200'
-                          : ''
-                          }`}
-                        onClick={() => {
-                          setCurrentQuestionIndex(index);
-                          updateCurrentPassage(index);
-                          setQuestionStartTime(Date.now());
-                        }}
-                      >
-                        {index + 1}
-                      </Button>
-                    ))}
-                  </div>
-                </ScrollArea>
-                <div className="mt-4 text-xs text-muted-foreground">
-                  <div className="flex items-center gap-2 mb-1">
-                    <div className="w-3 h-3 bg-green-100 border border-green-300 rounded"></div>
-                    <span>Answered</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <div className="w-3 h-3 bg-white border border-gray-300 rounded"></div>
-                    <span>Not answered</span>
-                  </div>
-                </div>
               </CardContent>
             </Card>
           </div>

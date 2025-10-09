@@ -2,6 +2,7 @@
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import {
   BarChart,
   Bar,
@@ -25,6 +26,8 @@ import {
   Award,
   Clock,
   CheckCircle,
+  Zap,
+  Sparkles,
 } from 'lucide-react';
 
 const stats = [
@@ -59,6 +62,22 @@ const stats = [
     trend: 'up',
     icon: CheckCircle,
     color: 'text-emerald-600',
+  },
+  {
+    title: 'Batch Created',
+    value: '24',
+    change: 'New!',
+    trend: 'up',
+    icon: Zap,
+    color: 'text-blue-500',
+  },
+  {
+    title: 'Templates Used',
+    value: '8',
+    change: 'New!',
+    trend: 'up',
+    icon: Sparkles,
+    color: 'text-purple-500',
   },
 ];
 
@@ -120,7 +139,7 @@ export default function DashboardPage() {
       </div>
 
       {/* Stats Grid */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
         {stats.map((stat) => (
           <Card key={stat.title} className="hover:shadow-md transition-shadow">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -138,6 +157,8 @@ export default function DashboardPage() {
           </Card>
         ))}
       </div>
+
+  
 
       <div className="grid gap-6 lg:grid-cols-7">
         {/* Monthly Activity Chart */}

@@ -1,0 +1,993 @@
+{
+  "title": "BHV English Entrance Examination - Complete Reading Test",
+  "description": "Full reading comprehension test with 100 questions covering grammar, vocabulary, and reading comprehension",
+  "type": "reading",
+  "duration": 90,
+  "totalPoints": 100,
+  "passages": [
+    {
+      "title": "Read the following passage carefully and answer the questions below",
+      "content": "The ancient library of Alexandria, which served as the intellectual and cultural hub of Egypt for 250 years, was tragically destroyed in 43 BC in a fire. Now there is widespread speculation about its true beginnings. The most popular theory is that Ptolemy I, who ruled from 304 to 282 BC, gathered a vast selection of kingship, ruling and world's people so he might understand better trade terms and how to lead his subjects.\n\nPtolemy longed to possess all the literature in the world. The manuscripts took the form of scrolls kept in pigeonholes, the best of them wrapped in jackets of leather or linen. They were likely to have remained in the groups in which they were acquired, rather than being properly categorized. Parchment paper wasn't used until later when the first books began to be written and kept in wooden chests in Roman times.\n\nAs the library expanded, Ptolemy's successors used many unethical methods to obtain manuscripts. One source claims that every ship sailing into Alexandria's harbor was carefully searched and if a book was found, it would be confiscated and taken to the library. At the library, it was examined and a decision would be made whether to keep it or make a replacement copy to return to the owner with some reimbursement or just return the original copy if the book is not valuable enough.",
+      "type": "reading",
+      "sections": [
+        {
+          "name": "Questions 96-100: Reading Comprehension",
+          "instructions": "Read the following passage carefully and answer the questions below (5 points)",
+          "range": { "start": 96, "end": 100 },
+          "questions": [
+            {
+              "number": 96,
+              "type": "multiple-choice",
+              "prompt": "How old was the Library of Alexandria before it was destroyed by fire?",
+              "options": ["43 years", "250 years", "304 years", "22 years"],
+              "correctAnswer": "250 years",
+              "points": 1
+            },
+            {
+              "number": 97,
+              "type": "multiple-choice",
+              "prompt": "Who was Ptolemy I?",
+              "options": [
+                "The man who designed the Library of Alexandria.",
+                "The man who burned the Library of Alexandria.",
+                "An Egyptian ruler from 304 to 282 BC.",
+                "The man who owned all the books in the world."
+              ],
+              "correctAnswer": "An Egyptian ruler from 304 to 282 BC.",
+              "points": 1
+            },
+            {
+              "number": 98,
+              "type": "multiple-choice",
+              "prompt": "Where were parchment paper books kept?",
+              "options": ["In pigeonholes", "In jackets of leather or linen", "In Roman times", "In wooden chests"],
+              "correctAnswer": "In wooden chests",
+              "points": 1
+            },
+            {
+              "number": 99,
+              "type": "multiple-choice",
+              "prompt": "In which situation would a book be given back to its owner?",
+              "options": [
+                "If the library already had a similar copy.",
+                "If the book had no value.",
+                "If the owner paid some reimbursement.",
+                "If the owner made a replacement copy and gave it to the library."
+              ],
+              "correctAnswer": "If the book had no value.",
+              "points": 1
+            },
+            {
+              "number": 100,
+              "type": "multiple-choice",
+              "prompt": "Which one is the best title for the reading passage?",
+              "options": [
+                "The history of the Library of Alexandria.",
+                "Ways to keep books in Ancient Egypt.",
+                "How Ptolemy obtained books.",
+                "The history of libraries around the world."
+              ],
+              "correctAnswer": "The history of the Library of Alexandria.",
+              "points": 1
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "sections": [
+    {
+      "sectionNumber": 1,
+      "title": "Choose the correct answer",
+      "description": "You can only choose ONE answer for each sentence.",
+      "points": 90,
+      "questions": [
+        {
+          "questionNumber": 1,
+          "question": "My father ___ a cup of coffee every morning.",
+          "options": ["is drinking", "drink", "drinks", "will be drinking"],
+          "correctAnswer": "drinks",
+          "points": 1,
+          "difficulty": "easy",
+          "tags": ["present-simple", "habits"]
+        },
+        {
+          "questionNumber": 2,
+          "question": "I ___ my keys at home.",
+          "options": ["forgot", "forget", "am forgetting", "was forgetting"],
+          "correctAnswer": "forgot",
+          "points": 1,
+          "difficulty": "easy",
+          "tags": ["past-simple"]
+        },
+        {
+          "questionNumber": 3,
+          "question": "I ___ now, please call back later.",
+          "options": ["work", "will be working", "am going to work", "am working"],
+          "correctAnswer": "am working",
+          "points": 1,
+          "difficulty": "easy",
+          "tags": ["present-continuous"]
+        },
+        {
+          "questionNumber": 4,
+          "question": "Tom and Brad ___ the best students in my class last semester.",
+          "options": ["was", "were", "are", "is"],
+          "correctAnswer": "were",
+          "points": 1,
+          "difficulty": "easy",
+          "tags": ["past-simple", "subject-verb-agreement"]
+        },
+        {
+          "questionNumber": 5,
+          "question": "She checks the mailbox every morning, but she ___ check it this morning.",
+          "options": ["don't", "doesn't", "didn't", "isn't"],
+          "correctAnswer": "didn't",
+          "points": 1,
+          "difficulty": "medium",
+          "tags": ["past-simple", "negation"]
+        },
+        {
+          "questionNumber": 6,
+          "question": "You'd better not ___ the same mistake again.",
+          "options": ["make", "made", "making", "to make"],
+          "correctAnswer": "make",
+          "points": 1,
+          "difficulty": "medium",
+          "tags": ["infinitive", "modal-verbs"]
+        },
+        {
+          "questionNumber": 7,
+          "question": "John was playing the piano while Mary ___ a happy song.",
+          "options": ["is singing", "sang", "was singing", "sings"],
+          "correctAnswer": "was singing",
+          "points": 1,
+          "difficulty": "medium",
+          "tags": ["past-continuous", "while-clause"]
+        },
+        {
+          "questionNumber": 8,
+          "question": "I will change the curtains, dust the furniture and ___ the dishes.",
+          "options": ["wash", "washing", "washed", "was washing"],
+          "correctAnswer": "wash",
+          "points": 1,
+          "difficulty": "easy",
+          "tags": ["parallel-structure"]
+        },
+        {
+          "questionNumber": 9,
+          "question": "If you ___ late next time, you should call and let us know.",
+          "options": ["are", "were", "was", "will be"],
+          "correctAnswer": "are",
+          "points": 1,
+          "difficulty": "medium",
+          "tags": ["conditional-type-1"]
+        },
+        {
+          "questionNumber": 10,
+          "question": "If Mr. Brown ___ now, I will come back later.",
+          "options": ["teaches", "will teach", "teach", "is teaching"],
+          "correctAnswer": "is teaching",
+          "points": 1,
+          "difficulty": "medium",
+          "tags": ["conditional-type-1", "present-continuous"]
+        },
+        {
+          "questionNumber": 11,
+          "question": "If you have nothing else to do, you ___ go home first.",
+          "options": ["can", "could", "must", "will"],
+          "correctAnswer": "can",
+          "points": 1,
+          "difficulty": "easy",
+          "tags": ["modal-verbs"]
+        },
+        {
+          "questionNumber": 12,
+          "question": "If he ___ the direction, he can ask the teacher.",
+          "options": ["is not understanding", "will not understand", "doesn't understand", "don't understand"],
+          "correctAnswer": "doesn't understand",
+          "points": 1,
+          "difficulty": "medium",
+          "tags": ["conditional-type-1", "negation"]
+        },
+        {
+          "questionNumber": 13,
+          "question": "Neither the workers nor the supervisor ___ why the accident happened.",
+          "options": ["know", "doesn't know", "don't know", "knows"],
+          "correctAnswer": "knows",
+          "points": 1,
+          "difficulty": "hard",
+          "tags": ["subject-verb-agreement", "neither-nor"]
+        },
+        {
+          "questionNumber": 14,
+          "question": "Kelly and John ___ some similar characteristics.",
+          "options": ["share", "shares", "are sharing", "is sharing"],
+          "correctAnswer": "share",
+          "points": 1,
+          "difficulty": "easy",
+          "tags": ["subject-verb-agreement"]
+        },
+        {
+          "questionNumber": 15,
+          "question": "___ money do you need for this project?",
+          "options": ["How many", "How much", "How a lot", "How about"],
+          "correctAnswer": "How much",
+          "points": 1,
+          "difficulty": "easy",
+          "tags": ["quantifiers", "uncountable-nouns"]
+        },
+        {
+          "questionNumber": 16,
+          "question": "There ___ an elementary school and a library right here when I was young.",
+          "options": ["is", "was", "were", "are"],
+          "correctAnswer": "was",
+          "points": 1,
+          "difficulty": "medium",
+          "tags": ["there-is-are", "past-simple"]
+        },
+        {
+          "questionNumber": 17,
+          "question": "There ___ many people on the street last night, celebrating the victory of our football team.",
+          "options": ["was", "were", "is", "are"],
+          "correctAnswer": "were",
+          "points": 1,
+          "difficulty": "easy",
+          "tags": ["there-is-are", "past-simple"]
+        },
+        {
+          "questionNumber": 18,
+          "question": "The teacher didn't give us ___ homework today.",
+          "options": ["many", "much", "few", "a few"],
+          "correctAnswer": "much",
+          "points": 1,
+          "difficulty": "easy",
+          "tags": ["quantifiers", "uncountable-nouns"]
+        },
+        {
+          "questionNumber": 19,
+          "question": "Someone ___ you. You should be careful.",
+          "options": ["follow", "follows", "is following", "are following"],
+          "correctAnswer": "is following",
+          "points": 1,
+          "difficulty": "medium",
+          "tags": ["present-continuous", "subject-verb-agreement"]
+        },
+        {
+          "questionNumber": 20,
+          "question": "Not only Kenneth but also his wife ___ a master degree.",
+          "options": ["have", "has", "is have", "are having"],
+          "correctAnswer": "has",
+          "points": 1,
+          "difficulty": "hard",
+          "tags": ["subject-verb-agreement", "not-only-but-also"]
+        },
+        {
+          "questionNumber": 21,
+          "question": "Nobody ___ his boring jokes.",
+          "options": ["like", "is liking", "is like", "likes"],
+          "correctAnswer": "likes",
+          "points": 1,
+          "difficulty": "easy",
+          "tags": ["subject-verb-agreement", "indefinite-pronouns"]
+        },
+        {
+          "questionNumber": 22,
+          "question": "Can you hurry up? The guests ___ for us in the dining room.",
+          "options": ["is waiting", "are waiting", "wait", "waits"],
+          "correctAnswer": "are waiting",
+          "points": 1,
+          "difficulty": "easy",
+          "tags": ["present-continuous"]
+        },
+        {
+          "questionNumber": 23,
+          "question": "My son doesn't like ice cream but my daughter ___.",
+          "options": ["doesn't", "isn't", "is", "does"],
+          "correctAnswer": "does",
+          "points": 1,
+          "difficulty": "medium",
+          "tags": ["auxiliary-verbs", "ellipsis"]
+        },
+        {
+          "questionNumber": 24,
+          "question": "I can't see anything from here. ___ we.",
+          "options": ["Neither do", "Either do", "Neither can", "Neither can't"],
+          "correctAnswer": "Neither can",
+          "points": 1,
+          "difficulty": "medium",
+          "tags": ["neither", "inversion"]
+        },
+        {
+          "questionNumber": 25,
+          "question": "Please tell Mom that I ___ not be home for dinner tonight.",
+          "options": ["may", "should", "must", "would rather"],
+          "correctAnswer": "may",
+          "points": 1,
+          "difficulty": "easy",
+          "tags": ["modal-verbs", "possibility"]
+        },
+        {
+          "questionNumber": 26,
+          "question": "She was driving on her way home ___ the thief broke into her house.",
+          "options": ["while", "when", "before", "since"],
+          "correctAnswer": "when",
+          "points": 1,
+          "difficulty": "medium",
+          "tags": ["time-clauses", "when-while"]
+        },
+        {
+          "questionNumber": 27,
+          "question": "I ran into George ___ I was shopping at the mall.",
+          "options": ["as", "since", "until", "while"],
+          "correctAnswer": "while",
+          "points": 1,
+          "difficulty": "medium",
+          "tags": ["time-clauses", "while"]
+        },
+        {
+          "questionNumber": 28,
+          "question": "She will have been working here for 10 years ___ she turns 40.",
+          "options": ["by the time", "until", "by", "after"],
+          "correctAnswer": "by the time",
+          "points": 1,
+          "difficulty": "hard",
+          "tags": ["time-clauses", "future-perfect-continuous"]
+        },
+        {
+          "questionNumber": 29,
+          "question": "She has been selling handicrafts ___ she was a college student.",
+          "options": ["until", "before", "after", "since"],
+          "correctAnswer": "since",
+          "points": 1,
+          "difficulty": "medium",
+          "tags": ["present-perfect-continuous", "since"]
+        },
+        {
+          "questionNumber": 30,
+          "question": "___ I not warned you, you would have told him our secret.",
+          "options": ["Had", "Should", "Were", "Must"],
+          "correctAnswer": "Had",
+          "points": 1,
+          "difficulty": "hard",
+          "tags": ["conditional-type-3", "inversion"]
+        },
+        {
+          "questionNumber": 31,
+          "question": "___ you to hide the truth, I would never forgive you.",
+          "options": ["Had", "Were", "Should", "If"],
+          "correctAnswer": "Were",
+          "points": 1,
+          "difficulty": "hard",
+          "tags": ["conditional-type-2", "inversion"]
+        },
+        {
+          "questionNumber": 32,
+          "question": "Why is he avoiding us? He ___ done something bad.",
+          "options": ["must have", "should have", "could have", "would have"],
+          "correctAnswer": "must have",
+          "points": 1,
+          "difficulty": "hard",
+          "tags": ["modal-perfect", "deduction"]
+        },
+        {
+          "questionNumber": 33,
+          "question": "I'm sorry. I ___ told you the truth, but I didn't.",
+          "options": ["must have", "should have", "may have", "might have"],
+          "correctAnswer": "should have",
+          "points": 1,
+          "difficulty": "medium",
+          "tags": ["modal-perfect", "regret"]
+        },
+        {
+          "questionNumber": 34,
+          "question": "If only you ___ there with me that night.",
+          "options": ["were", "was", "are", "had been"],
+          "correctAnswer": "had been",
+          "points": 1,
+          "difficulty": "hard",
+          "tags": ["if-only", "past-unreal"]
+        },
+        {
+          "questionNumber": 35,
+          "question": "Don't go anywhere until I ___.",
+          "options": ["will come back", "come back", "am coming back", "shall come back"],
+          "correctAnswer": "come back",
+          "points": 1,
+          "difficulty": "medium",
+          "tags": ["time-clauses", "future-meaning"]
+        },
+        {
+          "questionNumber": 36,
+          "question": "It's time you ___ your past behind. You must move on.",
+          "options": ["leave", "left", "will leave", "should leave"],
+          "correctAnswer": "left",
+          "points": 1,
+          "difficulty": "hard",
+          "tags": ["its-time", "past-subjunctive"]
+        },
+        {
+          "questionNumber": 37,
+          "question": "She looked at me as if I ___ her.",
+          "options": ["am insulting", "were insulting", "insulted", "had insulted"],
+          "correctAnswer": "had insulted",
+          "points": 1,
+          "difficulty": "hard",
+          "tags": ["as-if", "past-perfect"]
+        },
+        {
+          "questionNumber": 38,
+          "question": "He should quit ___. It's not good for his health.",
+          "options": ["smoke", "smoking", "to smoke", "and smoke"],
+          "correctAnswer": "smoking",
+          "points": 1,
+          "difficulty": "easy",
+          "tags": ["gerund", "quit"]
+        },
+        {
+          "questionNumber": 39,
+          "question": "She left her baby ___ for an hour.",
+          "options": ["to cry", "cried", "cries", "crying"],
+          "correctAnswer": "crying",
+          "points": 1,
+          "difficulty": "medium",
+          "tags": ["participle", "leave-something-doing"]
+        },
+        {
+          "questionNumber": 40,
+          "question": "I advised him ___ another job.",
+          "options": ["to look for", "look for", "looking for", "should look for"],
+          "correctAnswer": "to look for",
+          "points": 1,
+          "difficulty": "easy",
+          "tags": ["infinitive", "advise"]
+        },
+        {
+          "questionNumber": 41,
+          "question": "We have some trouble ___ this part of the reading.",
+          "options": ["to understand", "understand", "understanding", "to understanding"],
+          "correctAnswer": "understanding",
+          "points": 1,
+          "difficulty": "medium",
+          "tags": ["gerund", "have-trouble"]
+        },
+        {
+          "questionNumber": 42,
+          "question": "Can you make this computer ___?",
+          "options": ["work", "working", "to work", "to be worked"],
+          "correctAnswer": "work",
+          "points": 1,
+          "difficulty": "medium",
+          "tags": ["causative", "make"]
+        },
+        {
+          "questionNumber": 43,
+          "question": "Did you remember ___ the lights before you left the room?",
+          "options": ["turns", "turn off", "to turn off", "turned off"],
+          "correctAnswer": "to turn off",
+          "points": 1,
+          "difficulty": "medium",
+          "tags": ["infinitive", "remember-to-do"]
+        },
+        {
+          "questionNumber": 44,
+          "question": "You'd better stop ___ TV and go out for some sunshine.",
+          "options": ["watching", "to watch", "watch", "to be watched"],
+          "correctAnswer": "watching",
+          "points": 1,
+          "difficulty": "medium",
+          "tags": ["gerund", "stop-doing"]
+        },
+        {
+          "questionNumber": 45,
+          "question": "She stopped ___ the old lady cross the street.",
+          "options": ["helping", "helped", "to help", "help"],
+          "correctAnswer": "to help",
+          "points": 1,
+          "difficulty": "medium",
+          "tags": ["infinitive", "stop-to-do"]
+        },
+        {
+          "questionNumber": 46,
+          "question": "I want you ___ me everything you saw.",
+          "options": ["tell", "telling", "told", "to tell"],
+          "correctAnswer": "to tell",
+          "points": 1,
+          "difficulty": "easy",
+          "tags": ["infinitive", "want-someone-to-do"]
+        },
+        {
+          "questionNumber": 47,
+          "question": "We found him ___ in the corner.",
+          "options": ["hide", "to hide", "hiding", "hidden"],
+          "correctAnswer": "hiding",
+          "points": 1,
+          "difficulty": "medium",
+          "tags": ["participle", "find-someone-doing"]
+        },
+        {
+          "questionNumber": 48,
+          "question": "The moment I walked in, I saw them ___ with each other.",
+          "options": ["fight", "fighting", "to fight", "fought"],
+          "correctAnswer": "fighting",
+          "points": 1,
+          "difficulty": "medium",
+          "tags": ["participle", "see-someone-doing"]
+        },
+        {
+          "questionNumber": 49,
+          "question": "His older brother started him ___ the guitar.",
+          "options": ["to play", "play", "played", "playing"],
+          "correctAnswer": "playing",
+          "points": 1,
+          "difficulty": "medium",
+          "tags": ["gerund", "start"]
+        },
+        {
+          "questionNumber": 50,
+          "question": "If you park here, your car will get ___ away.",
+          "options": ["taken", "took", "taking", "take"],
+          "correctAnswer": "taken",
+          "points": 1,
+          "difficulty": "medium",
+          "tags": ["passive", "get-passive"]
+        },
+        {
+          "questionNumber": 51,
+          "question": "He lives ___ a very quiet street in the suburban area.",
+          "options": ["in", "on", "at", "inside"],
+          "correctAnswer": "on",
+          "points": 1,
+          "difficulty": "easy",
+          "tags": ["prepositions", "place"]
+        },
+        {
+          "questionNumber": 52,
+          "question": "The city will go under another lockdown ___ tomorrow.",
+          "options": ["since", "for", "as of", "as"],
+          "correctAnswer": "as of",
+          "points": 1,
+          "difficulty": "medium",
+          "tags": ["prepositions", "time"]
+        },
+        {
+          "questionNumber": 53,
+          "question": "We have heard about it ___ last week.",
+          "options": ["from", "as of", "since", "as"],
+          "correctAnswer": "since",
+          "points": 1,
+          "difficulty": "easy",
+          "tags": ["prepositions", "time", "present-perfect"]
+        },
+        {
+          "questionNumber": 54,
+          "question": "I promise I will finish everything ___ an hour.",
+          "options": ["within", "with", "during", "on"],
+          "correctAnswer": "within",
+          "points": 1,
+          "difficulty": "medium",
+          "tags": ["prepositions", "time"]
+        },
+        {
+          "questionNumber": 55,
+          "question": "You were sleeping ___ the lecture. That's why you missed that important part.",
+          "options": ["within", "while", "during", "in"],
+          "correctAnswer": "during",
+          "points": 1,
+          "difficulty": "medium",
+          "tags": ["prepositions", "time", "during-while"]
+        },
+        {
+          "questionNumber": 56,
+          "question": "She walked ___ me but she didn't see me.",
+          "options": ["past", "pass", "through", "above"],
+          "correctAnswer": "past",
+          "points": 1,
+          "difficulty": "medium",
+          "tags": ["prepositions", "movement"]
+        },
+        {
+          "questionNumber": 57,
+          "question": "What he told me is just ___ my imagination.",
+          "options": ["above", "over", "beyond", "before"],
+          "correctAnswer": "beyond",
+          "points": 1,
+          "difficulty": "hard",
+          "tags": ["prepositions", "idiomatic"]
+        },
+        {
+          "questionNumber": 58,
+          "question": "___ her guidance, we finally finished it.",
+          "options": ["Due to", "Thanks to", "Because", "For"],
+          "correctAnswer": "Thanks to",
+          "points": 1,
+          "difficulty": "medium",
+          "tags": ["prepositions", "reason"]
+        },
+        {
+          "questionNumber": 59,
+          "question": "___ the oldest brother, Tim has to take care of his younger siblings when their parents passed away.",
+          "options": ["Similar to", "As", "Like", "The same as"],
+          "correctAnswer": "As",
+          "points": 1,
+          "difficulty": "hard",
+          "tags": ["prepositions", "as-like"]
+        },
+        {
+          "questionNumber": 60,
+          "question": "___ waiting for us, he decided to do it by himself.",
+          "options": ["Despite", "In spite of", "Instead of", "Against"],
+          "correctAnswer": "Instead of",
+          "points": 1,
+          "difficulty": "medium",
+          "tags": ["prepositions", "contrast"]
+        },
+        {
+          "questionNumber": 61,
+          "question": "Are you sure that you can cook the whole chicken ___ this pot? It's too small.",
+          "options": ["by", "with", "of", "in"],
+          "correctAnswer": "in",
+          "points": 1,
+          "difficulty": "easy",
+          "tags": ["prepositions", "place"]
+        },
+        {
+          "questionNumber": 62,
+          "question": "Is this cheese made ___ goat milk? It has a distinct taste.",
+          "options": ["by", "with", "from", "of"],
+          "correctAnswer": "from",
+          "points": 1,
+          "difficulty": "medium",
+          "tags": ["prepositions", "made-of-from"]
+        },
+        {
+          "questionNumber": 63,
+          "question": "My father made this chair ___ rosewood.",
+          "options": ["by", "of", "with", "from"],
+          "correctAnswer": "from",
+          "points": 1,
+          "difficulty": "medium",
+          "tags": ["prepositions", "made-of-from"]
+        },
+        {
+          "questionNumber": 64,
+          "question": "Why are we keeping Gordon in our group? He did nothing but ___.",
+          "options": ["complaining", "complain", "to complain", "complains"],
+          "correctAnswer": "complain",
+          "points": 1,
+          "difficulty": "medium",
+          "tags": ["infinitive", "nothing-but"]
+        },
+        {
+          "questionNumber": 65,
+          "question": "Not until we threatened to call the police ___ give us back the money he stole.",
+          "options": ["will he", "does he", "did he", "can he"],
+          "correctAnswer": "did he",
+          "points": 1,
+          "difficulty": "hard",
+          "tags": ["inversion", "not-until"]
+        },
+        {
+          "questionNumber": 66,
+          "question": "She failed this job interview ___ she didn't prepare for it.",
+          "options": ["thanks to the fact that", "due to the fact that", "because of", "in order that"],
+          "correctAnswer": "due to the fact that",
+          "points": 1,
+          "difficulty": "medium",
+          "tags": ["connectors", "reason"]
+        },
+        {
+          "questionNumber": 67,
+          "question": "___ we start going now, we won't be able to catch up with them.",
+          "options": ["If", "As though", "Even if", "Even"],
+          "correctAnswer": "Even if",
+          "points": 1,
+          "difficulty": "medium",
+          "tags": ["connectors", "concession"]
+        },
+        {
+          "questionNumber": 68,
+          "question": "___ I tried my best to explain and apologize to her, she didn't forgive me.",
+          "options": ["As if", "Even", "Even if", "If"],
+          "correctAnswer": "Even if",
+          "points": 1,
+          "difficulty": "medium",
+          "tags": ["connectors", "concession"]
+        },
+        {
+          "questionNumber": 69,
+          "question": "I don't like hip hop ___ my cousin is a huge fan of it.",
+          "options": ["whereas", "whenas", "when", "although"],
+          "correctAnswer": "whereas",
+          "points": 1,
+          "difficulty": "medium",
+          "tags": ["connectors", "contrast"]
+        },
+        {
+          "questionNumber": 70,
+          "question": "___ sleeping last night, I heard a loud noise in the kitchen.",
+          "options": ["Because", "While", "Upon", "As soon as"],
+          "correctAnswer": "While",
+          "points": 1,
+          "difficulty": "easy",
+          "tags": ["connectors", "time"]
+        },
+        {
+          "questionNumber": 71,
+          "question": "___ I am here, you can ask me any question if you like.",
+          "options": ["Now that", "For", "Since", "Because"],
+          "correctAnswer": "Now that",
+          "points": 1,
+          "difficulty": "medium",
+          "tags": ["connectors", "reason"]
+        },
+        {
+          "questionNumber": 72,
+          "question": "He doesn't dare to tell her that he loves her ___ he might lose her as a friend.",
+          "options": ["because of", "due to", "for fear that", "so that"],
+          "correctAnswer": "for fear that",
+          "points": 1,
+          "difficulty": "hard",
+          "tags": ["connectors", "purpose"]
+        },
+        {
+          "questionNumber": 73,
+          "question": "We couldn't finish our essay ___ the sudden power shortage last night.",
+          "options": ["thanks to", "because", "in order to", "because of"],
+          "correctAnswer": "because of",
+          "points": 1,
+          "difficulty": "easy",
+          "tags": ["connectors", "reason"]
+        },
+        {
+          "questionNumber": 74,
+          "question": "They will check your membership card before they ___ you enter the conference room.",
+          "options": ["will let", "let", "shall let", "would let"],
+          "correctAnswer": "let",
+          "points": 1,
+          "difficulty": "medium",
+          "tags": ["time-clauses", "future-meaning"]
+        },
+        {
+          "questionNumber": 75,
+          "question": "___ I was a high school student, I didn't have to study as much as my brother now.",
+          "options": ["While", "When", "As soon as", "Whereas"],
+          "correctAnswer": "When",
+          "points": 1,
+          "difficulty": "easy",
+          "tags": ["time-clauses"]
+        },
+        {
+          "questionNumber": 76,
+          "question": "They only ___ skilled workers with a college degree.",
+          "options": ["hire", "lease", "rent", "borrow"],
+          "correctAnswer": "hire",
+          "points": 1,
+          "difficulty": "easy",
+          "tags": ["vocabulary", "employment"]
+        },
+        {
+          "questionNumber": 77,
+          "question": "His girlfriend won the first prize of the school's beauty ___.",
+          "options": ["competition", "contest", "examination", "test"],
+          "correctAnswer": "contest",
+          "points": 1,
+          "difficulty": "easy",
+          "tags": ["vocabulary", "events"]
+        },
+        {
+          "questionNumber": 78,
+          "question": "I like to ___ dogs as pets.",
+          "options": ["raise", "grow", "bring up", "keep"],
+          "correctAnswer": "keep",
+          "points": 1,
+          "difficulty": "medium",
+          "tags": ["vocabulary", "animals"]
+        },
+        {
+          "questionNumber": 79,
+          "question": "He ___ stealing my money.",
+          "options": ["denied", "rejected", "refused", "objected"],
+          "correctAnswer": "denied",
+          "points": 1,
+          "difficulty": "easy",
+          "tags": ["vocabulary", "verbs"]
+        },
+        {
+          "questionNumber": 80,
+          "question": "Be brave, there is nothing to ___.",
+          "options": ["afraid", "scare", "fear", "frighten"],
+          "correctAnswer": "fear",
+          "points": 1,
+          "difficulty": "easy",
+          "tags": ["vocabulary", "emotions"]
+        },
+        {
+          "questionNumber": 81,
+          "question": "Can you help me ___ the grammar mistakes in my essay?",
+          "options": ["fix", "mend", "repair", "correct"],
+          "correctAnswer": "correct",
+          "points": 1,
+          "difficulty": "easy",
+          "tags": ["vocabulary", "verbs"]
+        },
+        {
+          "questionNumber": 82,
+          "question": "I'm ___ an apartment for rent in this area.",
+          "options": ["searching", "looking for", "finding", "looking up"],
+          "correctAnswer": "looking for",
+          "points": 1,
+          "difficulty": "easy",
+          "tags": ["vocabulary", "phrasal-verbs"]
+        },
+        {
+          "questionNumber": 83,
+          "question": "She tried to ___ the crying child but it cried even louder.",
+          "options": ["fear", "scare", "beat up", "comfort"],
+          "correctAnswer": "comfort",
+          "points": 1,
+          "difficulty": "easy",
+          "tags": ["vocabulary", "verbs"]
+        },
+        {
+          "questionNumber": 84,
+          "question": "I can ___ you some money if you promise to pay me back by next month.",
+          "options": ["borrow", "loan", "give", "show"],
+          "correctAnswer": "loan",
+          "points": 1,
+          "difficulty": "medium",
+          "tags": ["vocabulary", "money"]
+        },
+        {
+          "questionNumber": 85,
+          "question": "She ___ his job offer despite the high salary.",
+          "options": ["accepted", "respected", "rejected", "expected"],
+          "correctAnswer": "rejected",
+          "points": 1,
+          "difficulty": "easy",
+          "tags": ["vocabulary", "verbs"]
+        },
+        {
+          "questionNumber": 86,
+          "question": "The company is planning to ___ one-fifth of its employee due to the economy's depression.",
+          "options": ["lay off", "employ", "unemployed", "hire"],
+          "correctAnswer": "lay off",
+          "points": 1,
+          "difficulty": "medium",
+          "tags": ["vocabulary", "phrasal-verbs", "employment"]
+        },
+        {
+          "questionNumber": 87,
+          "question": "Ever since people learned how to make fire, they didn't have to eat ___ food any longer.",
+          "options": ["rotten", "raw", "spoiled", "cooked"],
+          "correctAnswer": "raw",
+          "points": 1,
+          "difficulty": "easy",
+          "tags": ["vocabulary", "food"]
+        },
+        {
+          "questionNumber": 88,
+          "question": "I will officially pass this new rule if no one ___.",
+          "options": ["refuses", "rejects", "denies", "objects to it"],
+          "correctAnswer": "objects to it",
+          "points": 1,
+          "difficulty": "medium",
+          "tags": ["vocabulary", "verbs"]
+        },
+        {
+          "questionNumber": 89,
+          "question": "There is nothing that can ___ after her husband passed away.",
+          "options": ["cheer her up", "anger her", "annoy her", "humiliate her"],
+          "correctAnswer": "cheer her up",
+          "points": 1,
+          "difficulty": "medium",
+          "tags": ["vocabulary", "phrasal-verbs"]
+        },
+        {
+          "questionNumber": 90,
+          "question": "Stop ___ me while I'm talking.",
+          "options": ["interfering", "interrupting", "intervening", "intertwining"],
+          "correctAnswer": "interrupting",
+          "points": 1,
+          "difficulty": "easy",
+          "tags": ["vocabulary", "verbs"]
+        }
+      ]
+    },
+    {
+      "sectionNumber": 2,
+      "title": "Reading Comprehension",
+      "description": "Choose the sentence that has the closest meaning and answer questions about the passage",
+      "points": 10,
+      "questions": [
+        {
+          "questionNumber": 91,
+          "question": "That he doesn't want to help with the project doesn't bother me.",
+          "subType": "multiple-choice",
+          "options": [
+            "He doesn't bother me if he wants to help with the project.",
+            "I am bothered because he wants to help with the project.",
+            "With or without his help, I can still work on my project.",
+            "He doesn't want to help with the project that bothers me."
+          ],
+          "correctAnswer": "With or without his help, I can still work on my project.",
+          "points": 1,
+          "difficulty": "medium",
+          "tags": ["reading-comprehension", "paraphrasing"]
+        },
+        {
+          "questionNumber": 92,
+          "question": "His speech, though totally unprepared, was flawless.",
+          "subType": "multiple-choice",
+          "options": [
+            "Because he didn't prepare, he made a lot of mistakes in his speech.",
+            "He could have made a better speech if he had prepared for it.",
+            "If he had prepared, his speech could have been worse.",
+            "Without any preparation he still could deliver a wonderful speech."
+          ],
+          "correctAnswer": "Without any preparation he still could deliver a wonderful speech.",
+          "points": 1,
+          "difficulty": "medium",
+          "tags": ["reading-comprehension", "paraphrasing"]
+        },
+        {
+          "questionNumber": 93,
+          "question": "None of his performances were considered unsuccessful.",
+          "subType": "multiple-choice",
+          "options": [
+            "Most of his performances were very successful.",
+            "All of his performances were not very successful.",
+            "He was always successful in all his performances.",
+            "None of his performances were successful."
+          ],
+          "correctAnswer": "He was always successful in all his performances.",
+          "points": 1,
+          "difficulty": "hard",
+          "tags": ["reading-comprehension", "paraphrasing", "negation"]
+        },
+        {
+          "questionNumber": 94,
+          "question": "It's very unlikely that he doesn't have any experience in this matter.",
+          "subType": "multiple-choice",
+          "options": [
+            "He's unlikely to have any experience in this matter.",
+            "I think he is likely to be inexperienced in this matter.",
+            "I don't like the fact that he's inexperienced in this matter.",
+            "I believe he is experienced in this matter."
+          ],
+          "correctAnswer": "I believe he is experienced in this matter.",
+          "points": 1,
+          "difficulty": "hard",
+          "tags": ["reading-comprehension", "paraphrasing", "negation"]
+        },
+        {
+          "questionNumber": 95,
+          "question": "I haven't encountered a more challenging problem than this one.",
+          "subType": "multiple-choice",
+          "options": [
+            "This is the most difficult problem I have encountered.",
+            "I had more problems that were quite challenging.",
+            "All the problems I have encountered were more challenging than this one.",
+            "This is the more challenging problem I have encountered."
+          ],
+          "correctAnswer": "This is the most difficult problem I have encountered.",
+          "points": 1,
+          "difficulty": "medium",
+          "tags": ["reading-comprehension", "paraphrasing", "comparatives"]
+        }
+      ]
+    }
+  ],
+  "answerKey": {
+    "1": "C", "2": "A", "3": "D", "4": "B", "5": "C", "6": "A", "7": "C", "8": "A", "9": "A", "10": "D",
+    "11": "A", "12": "C", "13": "D", "14": "A", "15": "B", "16": "B", "17": "B", "18": "B", "19": "C", "20": "B",
+    "21": "D", "22": "B", "23": "D", "24": "C", "25": "A", "26": "B", "27": "D", "28": "A", "29": "D", "30": "A",
+    "31": "B", "32": "A", "33": "B", "34": "D", "35": "B", "36": "B", "37": "D", "38": "B", "39": "D", "40": "A",
+    "41": "C", "42": "A", "43": "C", "44": "A", "45": "C", "46": "D", "47": "C", "48": "B", "49": "D", "50": "A",
+    "51": "B", "52": "C", "53": "C", "54": "A", "55": "C", "56": "A", "57": "C", "58": "B", "59": "B", "60": "C",
+    "61": "D", "62": "C", "63": "B", "64": "B", "65": "C", "66": "B", "67": "C", "68": "A", "69": "A", "70": "B",
+    "71": "A", "72": "C", "73": "D", "74": "B", "75": "B", "76": "A", "77": "B", "78": "D", "79": "A", "80": "C",
+    "81": "D", "82": "B", "83": "D", "84": "B", "85": "C", "86": "A", "87": "B", "88": "D", "89": "A", "90": "B",
+    "91": "C", "92": "D", "93": "C", "94": "D", "95": "A", "96": "B", "97": "C", "98": "D", "99": "B", "100": "A"
+  }
+}
