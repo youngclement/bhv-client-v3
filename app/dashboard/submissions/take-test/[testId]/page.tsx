@@ -1,9 +1,10 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useRouter, useParams, useSearchParams } from 'next/navigation';
+import Image from 'next/image';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
@@ -35,6 +36,7 @@ import {
 } from 'lucide-react';
 import { authService } from '@/lib/auth';
 import { AudioPlayer } from '@/components/ui/audio-player';
+import { useToast } from '@/hooks/use-toast';
 
 interface Question {
   _id: string;
@@ -96,6 +98,7 @@ export default function TakeTestPage() {
   const router = useRouter();
   const params = useParams();
   const searchParams = useSearchParams();
+  const { toast } = useToast();
   const [test, setTest] = useState<Test | null>(null);
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [answers, setAnswers] = useState<Record<string, string>>({});
@@ -104,42 +107,73 @@ export default function TakeTestPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [questionStartTime, setQuestionStartTime] = useState(Date.now());
+  const [submissionError, setSubmissionError] = useState<string | null>(null);
 
-  const assignmentId = searchParams.get('assignment');
-  const existingSubmissionId = searchParams.get('submission');
+  const assignmentId = searchParams.get('assignment')?.trim() || null;
+  const existingSubmissionId = searchParams.get('submission')?.trim() || null;
 
   const handleSubmitTest = useCallback(async () => {
-    if (!submissionId) return;
+    if (!submissionId) {
+      toast({
+        title: 'Submission not ready',
+        description: 'Unable to submit because no active submission was found. Please refresh or reopen the test from your assignments.',
+        variant: 'destructive',
+      });
+      return;
+    }
 
     try {
-      await authService.apiRequest(`/submissions/submit/${submissionId}`, {
-        method: 'POST'
-      });
-
+      await authService.submitTest(submissionId);
       router.push(`/dashboard/submissions/results/${submissionId}`);
     } catch (error) {
       console.error('Failed to submit test:', error);
+      toast({
+        title: 'Failed to submit test',
+        description: error instanceof Error ? error.message : 'Please try again.',
+        variant: 'destructive',
+      });
     }
-  }, [submissionId, router]);
+  }, [submissionId, router, toast]);
 
   const initializeTest = useCallback(async (testId: string) => {
     try {
-      // Call actual API to get test data
+      setSubmissionError(null);
+      setSubmissionId(null);
+      setAnswers({});
+
       const testData = await authService.apiRequest(`/tests/${testId}`);
       setTest(testData);
-      setTimeRemaining(testData.duration * 60); // Convert to seconds
 
-      // Start or continue submission
+      const durationInMinutes = Number(testData?.duration);
+      if (Number.isFinite(durationInMinutes) && durationInMinutes > 0) {
+        setTimeRemaining(Math.floor(durationInMinutes * 60));
+      } else {
+        setTimeRemaining(0);
+      }
+
       if (existingSubmissionId) {
         setSubmissionId(existingSubmissionId);
-        // Load existing answers
-      } else if (assignmentId) {
-        // Start new submission
-        const submission = await authService.startSubmission(testId, assignmentId);
-        setSubmissionId(submission._id);
+        return;
       }
+
+      if (assignmentId) {
+        const submission = await authService.startSubmission(testId, assignmentId);
+        if (submission?._id) {
+          setSubmissionId(submission._id);
+          return;
+        }
+        throw new Error('Submission identifier missing in response.');
+      }
+
+      setSubmissionError('Missing assignment or submission information. Please open this test from your assignments list.');
     } catch (error) {
       console.error('Failed to initialize test:', error);
+      const fallbackMessage = 'Failed to initialize the test. Please refresh the page or contact support.';
+      if (error instanceof Error && error.message && !error.message.includes('API request failed')) {
+        setSubmissionError(error.message);
+      } else {
+        setSubmissionError(fallbackMessage);
+      }
     } finally {
       setLoading(false);
     }
@@ -168,22 +202,57 @@ export default function TakeTestPage() {
     }
   }, [timeRemaining, handleSubmitTest]);
 
+  const hasMeaningfulAnswer = useCallback((question: Question | undefined, answerValue?: string) => {
+    if (!answerValue) {
+      return false;
+    }
+
+    if (question?.subType === 'fill-blank') {
+      try {
+        const parsed = JSON.parse(answerValue);
+        if (Array.isArray(parsed)) {
+          return parsed.some((item) => typeof item === 'string' && item.trim().length > 0);
+        }
+      } catch {
+        return answerValue.trim().length > 0;
+      }
+      return false;
+    }
+
+    return answerValue.trim().length > 0;
+  }, []);
+
   const handleAnswerChange = useCallback(async (questionId: string, answer: string) => {
-    setAnswers(prev => ({ ...prev, [questionId]: answer }));
+    const targetQuestion = test?.questions.find((question) => question._id === questionId);
+    const isFilled = hasMeaningfulAnswer(targetQuestion, answer);
+    const payloadAnswer = isFilled
+      ? answer
+      : targetQuestion?.subType === 'fill-blank'
+        ? '[]'
+        : '';
+
+    setAnswers(prev => {
+      const updated = { ...prev };
+      if (isFilled) {
+        updated[questionId] = payloadAnswer;
+      } else {
+        delete updated[questionId];
+      }
+      return updated;
+    });
     
-    // Auto-save answer
     if (submissionId) {
       setSaving(true);
       try {
         const timeSpent = Math.floor((Date.now() - questionStartTime) / 1000);
-        await authService.saveAnswer(submissionId, questionId, answer, timeSpent);
+        await authService.saveAnswer(submissionId, questionId, payloadAnswer, timeSpent);
       } catch (error) {
         console.error('Failed to save answer:', error);
       } finally {
         setSaving(false);
       }
     }
-  }, [submissionId, questionStartTime]);
+  }, [submissionId, questionStartTime, test, hasMeaningfulAnswer]);
 
   const handleNextQuestion = () => {
     if (currentQuestionIndex < (test?.questions.length || 0) - 1) {
@@ -241,6 +310,23 @@ export default function TakeTestPage() {
     );
   }
 
+  if (submissionError) {
+    return (
+      <div className="text-center py-8 space-y-4">
+        <p className="text-muted-foreground">{submissionError}</p>
+        <div className="flex items-center justify-center gap-2">
+          <Button variant="outline" onClick={() => router.refresh()}>
+            Retry
+          </Button>
+          <Button onClick={() => router.push('/dashboard/submissions')}>
+            <ArrowLeft className="mr-2 h-4 w-4" />
+            Back to Submissions
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
   if (!test) {
     return (
       <div className="text-center py-8">
@@ -255,7 +341,12 @@ export default function TakeTestPage() {
 
   const currentQuestion = test.questions[currentQuestionIndex];
   const progress = ((currentQuestionIndex + 1) / test.questions.length) * 100;
-  const answeredCount = Object.keys(answers).length;
+  const answeredCount = useMemo(() => {
+    if (!test) return 0;
+    return test.questions.reduce((count, question) => {
+      return hasMeaningfulAnswer(question, answers[question._id]) ? count + 1 : count;
+    }, 0);
+  }, [test, answers, hasMeaningfulAnswer]);
 
   return (
     <div className="space-y-6">
@@ -359,7 +450,7 @@ export default function TakeTestPage() {
                           className="w-full h-auto max-h-96 object-contain"
                         />
                         <div className="p-2 text-xs text-muted-foreground bg-gray-50">
-                          {currentQuestion.imageFile.originalName} • {currentQuestion.imageFile.width}×{currentQuestion.imageFile.height} • {Math.round(currentQuestion.imageFile.bytes / 1024)}KB
+                          {currentQuestion.imageFile.originalName} - {currentQuestion.imageFile.width}x{currentQuestion.imageFile.height} - {Math.round(currentQuestion.imageFile.bytes / 1024)} KB
                         </div>
                       </div>
                     </div>
@@ -386,7 +477,7 @@ export default function TakeTestPage() {
                         className="w-full"
                       />
                       <div className="text-xs text-muted-foreground mt-2 p-2 bg-blue-50 rounded border border-blue-100">
-                        💡 You can replay the audio multiple times. Listen carefully before answering.
+                        Note: You can replay the audio multiple times. Listen carefully before answering.
                       </div>
                     </div>
                   )}
@@ -417,7 +508,7 @@ export default function TakeTestPage() {
                         className="border-2 border-blue-200"
                       />
                       <div className="text-xs text-muted-foreground p-2 bg-blue-50 rounded">
-                        💡 Listen carefully. You can replay the audio multiple times.
+                        Note: Listen carefully. You can replay the audio multiple times.
                       </div>
                     </div>
                   )}
@@ -603,7 +694,7 @@ export default function TakeTestPage() {
               {/* Submit Test */}
               <AlertDialog>
                 <AlertDialogTrigger asChild>
-                  <Button className="w-full" variant="default">
+                  <Button className="w-full" variant="default" disabled={!submissionId}>
                     <Send className="mr-2 h-4 w-4" />
                     Submit Test
                   </Button>

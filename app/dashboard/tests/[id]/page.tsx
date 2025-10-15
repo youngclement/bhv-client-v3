@@ -346,7 +346,7 @@ export default function TestDetailPage() {
                   <div>
                     <CardTitle>{test.title}</CardTitle>
                     <CardDescription>
-                      {test.type.charAt(0).toUpperCase() + test.type.slice(1)} Test • {formatDuration(test.duration)}
+                      {test.type.charAt(0).toUpperCase() + test.type.slice(1)} Test • {formatDuration(test.duration) ?? 'N/A' }
                     </CardDescription>
                   </div>
                 </div>

@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -8,11 +8,8 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
-import { Progress } from '@/components/ui/progress';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Checkbox } from '@/components/ui/checkbox';
-import { ScrollArea } from '@/components/ui/scroll-area';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
   Select,
   SelectContent,
@@ -21,22 +18,10 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-  AlertDialogTrigger,
-} from '@/components/ui/alert-dialog';
-import {
   ArrowLeft,
   Save,
   Plus,
   Trash2,
-  Edit2,
   Volume2,
   Image as ImageIcon,
   FileText,
@@ -48,14 +33,13 @@ import {
   X,
 } from 'lucide-react';
 import { authService } from '@/lib/auth';
-import { AudioUpload } from '@/components/ui/file-upload';
-import { ImageUpload } from '@/components/ui/file-upload';
 
 interface SubQuestion {
   subQuestionNumber: number;
   question: string;
+  subType: string; // Thêm subType cho sub-question
   options?: string[];
-  correctAnswer?: string;
+  correctAnswer?: any; // Schema.Types.Mixed
   points: number;
   explanation?: string;
   audioTimestamp?: {
@@ -65,7 +49,9 @@ interface SubQuestion {
 }
 
 interface Question {
-  type: 'reading' | 'listening' | 'writing';
+  testId?: string;
+  questionNumber?: number;
+  type: 'reading' | 'listening' | 'writing' | 'speaking' | 'full';
   subType: string;
   question: string;
   instructionText?: string;
@@ -73,7 +59,7 @@ interface Question {
   audioFile?: File | null;
   imageFile?: File | null;
   options?: string[];
-  correctAnswer?: string;
+  correctAnswer?: any; // Schema.Types.Mixed
   points: number;
   difficulty: 'easy' | 'medium' | 'hard';
   tags: string[];
@@ -84,38 +70,45 @@ interface Question {
   hasSubQuestions?: boolean;
   allowSubQuestions?: boolean;
   subQuestions?: SubQuestion[];
+  createdBy?: string;
+  isActive?: boolean;
 }
 
 const questionTypes = {
   reading: [
     { value: 'multiple-choice', label: 'Multiple Choice' },
-    { value: 'true-false-not-given', label: 'True/False/Not Given' },
-    { value: 'yes-no-not-given', label: 'Yes/No/Not Given' },
-    { value: 'matching-headings', label: 'Matching Headings' },
-    { value: 'matching-information', label: 'Matching Information' },
-    { value: 'sentence-completion', label: 'Sentence Completion' },
-    { value: 'summary-completion', label: 'Summary Completion' },
+    { value: 'fill-blank', label: 'Fill in the Blank' },
+    { value: 'matching', label: 'Matching' },
     { value: 'short-answer', label: 'Short Answer' },
+    { value: 'composite', label: 'Composite Question (có sub-questions)' },
   ],
   listening: [
-    { value: 'listening-multiple-choice', label: 'Multiple Choice' },
-    { value: 'form-completion', label: 'Form Completion' },
-    { value: 'note-completion', label: 'Note Completion' },
-    { value: 'table-completion', label: 'Table Completion' },
-    { value: 'flowchart-completion', label: 'Flowchart Completion' },
-    { value: 'sentence-completion', label: 'Sentence Completion' },
-    { value: 'summary-completion', label: 'Summary Completion' },
-    { value: 'diagram-labelling', label: 'Diagram Labelling' },
-    { value: 'map-labelling', label: 'Map Labelling' },
-    { value: 'plan-labelling', label: 'Plan Labelling' },
-    { value: 'listening-matching', label: 'Matching' },
-    { value: 'listening-short-answer', label: 'Short Answer' },
-    { value: 'pick-from-list', label: 'Pick from List' },
+    { value: 'multiple-choice', label: 'Multiple Choice' },
+    { value: 'fill-blank', label: 'Fill in the Blank' },
+    { value: 'matching', label: 'Matching' },
+    { value: 'short-answer', label: 'Short Answer' },
+    { value: 'composite', label: 'Composite Question (có sub-questions)' },
   ],
   writing: [
-    { value: 'task1', label: 'Task 1 (Academic/General)' },
-    { value: 'task2', label: 'Task 2 (Essay)' },
-    { value: 'essay', label: 'General Essay' },
+    { value: 'multiple-choice', label: 'Multiple Choice' },
+    { value: 'fill-blank', label: 'Fill in the Blank' },
+    { value: 'matching', label: 'Matching' },
+    { value: 'short-answer', label: 'Short Answer' },
+    { value: 'composite', label: 'Composite Question (có sub-questions)' },
+  ],
+  speaking: [
+    { value: 'multiple-choice', label: 'Multiple Choice' },
+    { value: 'fill-blank', label: 'Fill in the Blank' },
+    { value: 'matching', label: 'Matching' },
+    { value: 'short-answer', label: 'Short Answer' },
+    { value: 'composite', label: 'Composite Question (có sub-questions)' },
+  ],
+  full: [
+    { value: 'multiple-choice', label: 'Multiple Choice' },
+    { value: 'fill-blank', label: 'Fill in the Blank' },
+    { value: 'matching', label: 'Matching' },
+    { value: 'short-answer', label: 'Short Answer' },
+    { value: 'composite', label: 'Composite Question (có sub-questions)' },
   ],
 };
 
@@ -125,6 +118,7 @@ export default function CreateTestQuestionsPage() {
   const testId = params.id as string;
 
   const [question, setQuestion] = useState<Question>({
+    testId: testId,
     type: 'reading',
     subType: 'multiple-choice',
     question: '',
@@ -137,6 +131,7 @@ export default function CreateTestQuestionsPage() {
     hasSubQuestions: false,
     allowSubQuestions: false,
     subQuestions: [],
+    isActive: true,
   });
 
   const [loading, setLoading] = useState(false);
@@ -177,6 +172,7 @@ export default function CreateTestQuestionsPage() {
     const newSubQuestion: SubQuestion = {
       subQuestionNumber: (question.subQuestions?.length || 0) + 1,
       question: '',
+      subType: 'multiple-choice', // Mặc định là multiple-choice
       options: ['', '', '', ''],
       correctAnswer: '',
       points: 1,
@@ -246,6 +242,12 @@ export default function CreateTestQuestionsPage() {
     }));
   };
 
+  const sanitizeOptions = (options?: string[]) =>
+    (options || []).map(opt => opt.trim()).filter(opt => opt.length > 0);
+
+  const normalizeCorrectAnswer = (answer: any) =>
+    typeof answer === 'string' ? answer.trim() : answer;
+
   const validateQuestion = () => {
     if (!question.question.trim()) {
       setError('Vui lòng nhập nội dung câu hỏi');
@@ -263,13 +265,21 @@ export default function CreateTestQuestionsPage() {
       setError('Vui lòng nhập giới hạn từ cho câu hỏi Writing');
       return false;
     }
-    if (question.subType.includes('completion') && !question.blanksCount) {
+    if (question.subType === 'fill-blank' && !question.blanksCount) {
       setError('Vui lòng nhập số lượng chỗ trống');
       return false;
     }
-    if (question.subType.includes('multiple-choice') && (!question.options || question.options.length < 2)) {
-      setError('Vui lòng thêm ít nhất 2 lựa chọn cho câu hỏi trắc nghiệm');
-      return false;
+    if (question.subType.includes('multiple-choice')) {
+      const validOptions = sanitizeOptions(question.options);
+      if (validOptions.length < 2) {
+        setError('Vui lòng thêm ít nhất 2 lựa chọn cho câu hỏi trắc nghiệm');
+        return false;
+      }
+      const normalizedAnswer = normalizeCorrectAnswer(question.correctAnswer);
+      if (!normalizedAnswer || !validOptions.includes(normalizedAnswer)) {
+        setError('Vui lòng chọn đáp án đúng cho câu hỏi trắc nghiệm');
+        return false;
+      }
     }
     
     // Validate composite questions
@@ -279,15 +289,36 @@ export default function CreateTestQuestionsPage() {
         return false;
       }
       
+      if (question.subQuestions.length > 20) {
+        setError('Tối đa chỉ được 20 câu hỏi con');
+        return false;
+      }
+      
       for (let i = 0; i < question.subQuestions.length; i++) {
         const subQ = question.subQuestions[i];
         if (!subQ.question.trim()) {
           setError(`Vui lòng nhập nội dung cho câu hỏi con ${i + 1}`);
           return false;
         }
+        if (!subQ.subType) {
+          setError(`Vui lòng chọn loại câu hỏi cho câu hỏi con ${i + 1}`);
+          return false;
+        }
         if (subQ.points < 1) {
           setError(`Điểm số cho câu hỏi con ${i + 1} phải lớn hơn 0`);
           return false;
+        }
+        if (subQ.subType === 'multiple-choice') {
+          const validSubOptions = sanitizeOptions(subQ.options);
+          if (validSubOptions.length < 2) {
+            setError(`Vui lòng thêm ít nhất 2 lựa chọn cho câu hỏi con ${i + 1}`);
+            return false;
+          }
+          const normalizedSubAnswer = normalizeCorrectAnswer(subQ.correctAnswer);
+          if (!normalizedSubAnswer || !validSubOptions.includes(normalizedSubAnswer)) {
+            setError(`Vui lòng chọn đáp án đúng cho câu hỏi con ${i + 1}`);
+            return false;
+          }
         }
       }
     }
@@ -303,16 +334,19 @@ export default function CreateTestQuestionsPage() {
     setSuccess('');
 
     try {
-      const formData = new FormData();
-      
-      // Add question data
+      // Prepare question data according to API format
       const questionData = {
+        testId: question.testId,
         type: question.type,
         subType: question.subType,
         question: question.question,
+        points: question.points,
+        hasSubQuestions: question.hasSubQuestions || false,
+        allowSubQuestions: question.allowSubQuestions || false,
+        subQuestions: question.subQuestions || [],
+        // Optional fields
         instructionText: question.instructionText,
         passage: question.passage,
-        points: question.points,
         difficulty: question.difficulty,
         tags: question.tags,
         wordLimit: question.wordLimit,
@@ -320,31 +354,45 @@ export default function CreateTestQuestionsPage() {
         section: question.section,
         options: question.options,
         correctAnswer: question.correctAnswer,
-        isComposite: question.isComposite,
-        hasSubQuestions: question.hasSubQuestions,
-        allowSubQuestions: question.allowSubQuestions,
-        subQuestions: question.subQuestions,
+        isActive: question.isActive,
       };
 
-      formData.append('question', JSON.stringify(questionData));
+      // Check if we have files to upload
+      const hasFiles = question.audioFile || question.imageFile;
+      
+      let response;
+      if (hasFiles) {
+        // Use FormData for file uploads
+        const formData = new FormData();
+        formData.append('question', JSON.stringify(questionData));
+        
+        if (question.audioFile) {
+          formData.append('audioFile', question.audioFile);
+        }
+        if (question.imageFile) {
+          formData.append('imageFile', question.imageFile);
+        }
 
-      // Add files if present
-      if (question.audioFile) {
-        formData.append('audioFile', question.audioFile);
+        response = await authService.apiRequest('/questions', {
+          method: 'POST',
+          body: formData
+        });
+      } else {
+        // Use JSON for text-only questions
+        response = await authService.apiRequest('/questions', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(questionData)
+        });
       }
-      if (question.imageFile) {
-        formData.append('imageFile', question.imageFile);
-      }
-
-      const response = await authService.apiRequest('/questions', {
-        method: 'POST',
-        body: formData
-      });
 
       setSuccess('Câu hỏi đã được tạo thành công!');
       
       // Reset form
       setQuestion({
+        testId: testId,
         type: 'reading',
         subType: 'multiple-choice',
         question: '',
@@ -357,6 +405,7 @@ export default function CreateTestQuestionsPage() {
         hasSubQuestions: false,
         allowSubQuestions: false,
         subQuestions: [],
+        isActive: true,
       });
 
       // Redirect to test builder after a short delay
@@ -380,406 +429,537 @@ export default function CreateTestQuestionsPage() {
     }
   };
 
-  const getDifficultyColor = (difficulty: string) => {
-    switch (difficulty) {
-      case 'easy': return 'bg-green-100 text-green-800 border-green-200';
-      case 'medium': return 'bg-yellow-100 text-yellow-800 border-yellow-200';
-      case 'hard': return 'bg-red-100 text-red-800 border-red-200';
-      default: return 'bg-gray-100 text-gray-800 border-gray-200';
-    }
-  };
-
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
-      {/* Header */}
-      <div className="bg-white border-b border-slate-200 shadow-sm">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-between h-16">
-            <div className="flex items-center gap-3">
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => router.push(`/dashboard/tests/${testId}`)}
-                className="gap-2"
-              >
-                <ArrowLeft className="h-4 w-4" />
-                Quay lại
-              </Button>
-              <div className="border-l border-slate-300 pl-3">
-                <h1 className="text-lg font-semibold text-slate-900">Tạo Câu Hỏi Mới</h1>
-                <p className="text-sm text-slate-500">Thêm câu hỏi vào bài test</p>
-          </div>
-            </div>
-          </div>
+    <div>
+      {/* Page Header */}
+      <div className="mb-6">
+        <div className="flex items-center gap-3 mb-2">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => router.push(`/dashboard/tests/${testId}`)}
+            className="gap-2"
+          >
+            <ArrowLeft className="h-4 w-4" />
+            Quay lại
+          </Button>
+        </div>
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900">Tạo Câu Hỏi Mới</h1>
+          <p className="text-gray-600">Thêm câu hỏi vào bài test</p>
         </div>
       </div>
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-        {/* Success/Error Messages */}
-        {success && (
-          <div className="mb-6 p-4 bg-green-50 border border-green-200 rounded-lg flex items-center gap-2">
-            <CheckCircle className="h-5 w-5 text-green-600" />
-            <span className="text-green-800">{success}</span>
-          </div>
-        )}
-
-        {error && (
-          <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg flex items-center gap-2">
-            <AlertCircle className="h-5 w-5 text-red-600" />
-            <span className="text-red-800">{error}</span>
-          </div>
-        )}
-
-        <div className="grid gap-6 xl:grid-cols-4 lg:grid-cols-3">
-          {/* Main Form */}
-          <div className="xl:col-span-3 lg:col-span-2 space-y-6">
-            {/* Question Type Selection */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  {getTypeIcon(question.type)}
-                  Loại Câu Hỏi
-                </CardTitle>
-                <CardDescription>
-                  Chọn loại câu hỏi phù hợp với bài test IELTS
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                  {Object.entries(questionTypes).map(([type, subtypes]) => (
-                    <Button
-                      key={type}
-                      variant={question.type === type ? "default" : "outline"}
-                      onClick={() => handleTypeChange(type as any)}
-                      className="h-auto p-4 flex flex-col items-center gap-2"
-                    >
-                      {getTypeIcon(type)}
-                      <span className="capitalize font-medium">{type}</span>
-                    </Button>
-                  ))}
-                </div>
-
-                <div className="space-y-2">
-                  <Label>Loại câu hỏi cụ thể</Label>
-                  <Select
-                    value={question.subType}
-                    onValueChange={handleSubTypeChange}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Chọn loại câu hỏi" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {questionTypes[question.type].map((subtype) => (
-                        <SelectItem key={subtype.value} value={subtype.value}>
-                          {subtype.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+      {/* Success/Error Messages */}
+      {success && (
+        <div className="mb-6 p-4 bg-green-50 border border-green-200 rounded-lg flex items-center gap-2">
+          <CheckCircle className="h-5 w-5 text-green-600" />
+          <span className="text-green-800">{success}</span>
         </div>
-              </CardContent>
-            </Card>
+      )}
 
-            {/* Question Content */}
-            <Card>
-              <CardHeader>
-                <CardTitle>Nội Dung Câu Hỏi</CardTitle>
-                <CardDescription>
-                  Nhập nội dung câu hỏi và các thông tin liên quan
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="space-y-2">
-                  <Label htmlFor="instruction">Hướng dẫn (tùy chọn)</Label>
-                  <Textarea
-                    id="instruction"
-                    placeholder="Nhập hướng dẫn cho câu hỏi..."
-                    value={question.instructionText || ''}
-                    onChange={(e) => handleQuestionChange('instructionText', e.target.value)}
-                    rows={2}
-                  />
+      {error && (
+        <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg flex items-center gap-2">
+          <AlertCircle className="h-5 w-5 text-red-600" />
+          <span className="text-red-800">{error}</span>
+        </div>
+      )}
+
+      <div className="grid gap-6 lg:grid-cols-4">
+        {/* Main Form */}
+        <div className="lg:col-span-3 space-y-6">
+          {/* Question Type Selection */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                {getTypeIcon(question.type)}
+                Loại Câu Hỏi
+              </CardTitle>
+              <CardDescription>
+                Chọn loại câu hỏi phù hợp với bài test IELTS
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                {Object.entries(questionTypes).map(([type, subtypes]) => (
+                  <Button
+                    key={type}
+                    variant={question.type === type ? "default" : "outline"}
+                    onClick={() => handleTypeChange(type as any)}
+                    className="h-auto p-4 flex flex-col items-center gap-2"
+                  >
+                    {getTypeIcon(type)}
+                    <span className="capitalize font-medium">{type}</span>
+                  </Button>
+                ))}
+              </div>
+
+              <div className="space-y-2">
+                <Label>Loại câu hỏi cụ thể</Label>
+                <Select
+                  value={question.subType}
+                  onValueChange={handleSubTypeChange}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Chọn loại câu hỏi" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {questionTypes[question.type].map((subtype) => (
+                      <SelectItem key={subtype.value} value={subtype.value}>
+                        {subtype.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* Composite Question Info */}
+              {question.subType === 'composite' && (
+                <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                  <div className="flex items-start gap-3">
+                    <div className="flex-shrink-0">
+                      <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
+                        <Plus className="h-4 w-4 text-blue-600" />
+                      </div>
+                    </div>
+                    <div className="flex-1">
+                      <h4 className="font-medium text-blue-900 mb-1">Composite Question</h4>
+                      <p className="text-sm text-blue-700">
+                        Loại câu hỏi này cho phép bạn tạo nhiều câu hỏi con trong một câu hỏi chính. 
+                        Mỗi câu hỏi con có thể có điểm số và đáp án riêng.
+                      </p>
+                    </div>
+                  </div>
                 </div>
+              )}
+            </CardContent>
+          </Card>
 
+          {/* Question Content */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Nội Dung Câu Hỏi</CardTitle>
+              <CardDescription>
+                Nhập nội dung câu hỏi và các thông tin liên quan
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="instruction">Hướng dẫn (tùy chọn)</Label>
+                <Textarea
+                  id="instruction"
+                  placeholder="Nhập hướng dẫn cho câu hỏi..."
+                  value={question.instructionText || ''}
+                  onChange={(e) => handleQuestionChange('instructionText', e.target.value)}
+                  rows={2}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="question">Nội dung câu hỏi *</Label>
+                <Textarea
+                  id="question"
+                  placeholder="Nhập nội dung câu hỏi..."
+                  value={question.question}
+                  onChange={(e) => handleQuestionChange('question', e.target.value)}
+                  rows={4}
+                  className="resize-none"
+                />
+              </div>
+
+              {question.type === 'reading' && (
                 <div className="space-y-2">
-                  <Label htmlFor="question">Nội dung câu hỏi *</Label>
+                  <Label htmlFor="passage">Đoạn văn (tùy chọn)</Label>
                   <Textarea
-                    id="question"
-                    placeholder="Nhập nội dung câu hỏi..."
-                    value={question.question}
-                    onChange={(e) => handleQuestionChange('question', e.target.value)}
-                    rows={4}
+                    id="passage"
+                    placeholder="Nhập đoạn văn cho câu hỏi Reading..."
+                    value={question.passage || ''}
+                    onChange={(e) => handleQuestionChange('passage', e.target.value)}
+                    rows={6}
                     className="resize-none"
                   />
                 </div>
+              )}
+            </CardContent>
+          </Card>
 
-                {question.type === 'reading' && (
-                  <div className="space-y-2">
-                    <Label htmlFor="passage">Đoạn văn (tùy chọn)</Label>
-                    <Textarea
-                      id="passage"
-                      placeholder="Nhập đoạn văn cho câu hỏi Reading..."
-                      value={question.passage || ''}
-                      onChange={(e) => handleQuestionChange('passage', e.target.value)}
-                      rows={6}
-                      className="resize-none"
+          {/* Multiple Choice Options */}
+          {question.subType.includes('multiple-choice') && (
+            <Card>
+              <CardHeader>
+                <CardTitle>Các Lựa Chọn</CardTitle>
+                <CardDescription>
+                  Thêm các lựa chọn cho câu hỏi trắc nghiệm
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {question.options?.map((option, index) => (
+                  <div key={index} className="flex items-center gap-2">
+                    <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary text-primary-foreground text-sm font-semibold">
+                      {String.fromCharCode(65 + index)}
+                    </div>
+                    <Input
+                      placeholder={`Lựa chọn ${String.fromCharCode(65 + index)}`}
+                      value={option}
+                      onChange={(e) => handleOptionChange(index, e.target.value)}
+                      className="flex-1"
                     />
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => handleRemoveOption(index)}
+                      className="text-red-600 hover:text-red-700"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </div>
+                ))}
+                
+                <Button
+                  variant="outline"
+                  onClick={handleAddOption}
+                  className="w-full"
+                >
+                  <Plus className="h-4 w-4 mr-2" />
+                  Thêm lựa chọn
+                </Button>
+
+                <div className="space-y-2">
+                  <Label>Đáp án đúng</Label>
+                  <Select
+                    value={question.correctAnswer || ''}
+                    onValueChange={(value) => handleQuestionChange('correctAnswer', value)}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Chọn đáp án đúng" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {question.options?.map((option, index) => 
+                        option.trim() ? (
+                          <SelectItem key={index} value={option}>
+                            {String.fromCharCode(65 + index)}. {option}
+                          </SelectItem>
+                        ) : null
+                      )}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Composite Questions */}
+          {(question.isComposite || question.subType === 'composite') && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Plus className="h-4 w-4" />
+                  Câu Hỏi Con (Sub-Questions)
+                  {question.subQuestions && question.subQuestions.length > 0 && (
+                    <Badge variant="secondary" className="ml-2">
+                      {question.subQuestions.length} câu hỏi
+                    </Badge>
+                  )}
+                </CardTitle>
+                <CardDescription>
+                  Thêm các câu hỏi con cho composite question. Mỗi câu hỏi con sẽ có điểm số riêng. (Tối đa 20 câu hỏi con)
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {/* Add Sub-Question Button */}
+                <div className="flex justify-center">
+                  <Button
+                    variant="outline"
+                    onClick={handleAddSubQuestion}
+                    disabled={question.subQuestions && question.subQuestions.length >= 20}
+                    className="w-full max-w-md"
+                  >
+                    <Plus className="h-4 w-4 mr-2" />
+                    Thêm Câu Hỏi Con
+                    {question.subQuestions && question.subQuestions.length >= 20 && (
+                      <span className="ml-2 text-xs">(Đã đạt giới hạn 20)</span>
+                    )}
+                  </Button>
+                </div>
+
+                {question.subQuestions && question.subQuestions.length > 0 && (
+                  <div className="space-y-4">
+                    {question.subQuestions.map((subQ, index) => (
+                      <Card key={index} className="border-l-4 border-l-blue-500">
+                        <CardHeader className="pb-3">
+                          <div className="flex items-center justify-between">
+                            <CardTitle className="text-lg">
+                              Câu hỏi con {subQ.subQuestionNumber}
+                            </CardTitle>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleRemoveSubQuestion(index)}
+                              className="text-red-600 hover:text-red-700"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        </CardHeader>
+                        <CardContent className="space-y-4">
+                          <div className="space-y-2">
+                            <Label>Loại câu hỏi con</Label>
+                            <Select
+                              value={subQ.subType}
+                              onValueChange={(value) => handleUpdateSubQuestion(index, 'subType', value)}
+                            >
+                              <SelectTrigger>
+                                <SelectValue placeholder="Chọn loại câu hỏi" />
+                              </SelectTrigger>
+                               <SelectContent>
+                                 <SelectItem value="multiple-choice">Multiple Choice</SelectItem>
+                                 <SelectItem value="fill-blank">Fill in the Blank</SelectItem>
+                                 <SelectItem value="matching">Matching</SelectItem>
+                                 <SelectItem value="short-answer">Short Answer</SelectItem>
+                                 <SelectItem value="composite">Composite Question</SelectItem>
+                               </SelectContent>
+                            </Select>
+                          </div>
+
+                          <div className="space-y-2">
+                            <Label>Nội dung câu hỏi con</Label>
+                            <Textarea
+                              placeholder="Nhập nội dung câu hỏi con..."
+                              value={subQ.question}
+                              onChange={(e) => handleUpdateSubQuestion(index, 'question', e.target.value)}
+                              rows={2}
+                            />
+                          </div>
+
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                            <div className="space-y-2">
+                              <Label>Điểm số</Label>
+                              <Input
+                                type="number"
+                                min="1"
+                                value={subQ.points}
+                                onChange={(e) => handleUpdateSubQuestion(index, 'points', parseInt(e.target.value) || 1)}
+                              />
+                            </div>
+                            <div className="space-y-2">
+                              <Label>Giải thích (tùy chọn)</Label>
+                              <Input
+                                placeholder="Giải thích đáp án..."
+                                value={subQ.explanation || ''}
+                                onChange={(e) => handleUpdateSubQuestion(index, 'explanation', e.target.value)}
+                              />
+                            </div>
+                          </div>
+
+                          {/* Sub-question options - chỉ hiển thị cho multiple-choice */}
+                          {subQ.subType === 'multiple-choice' && (
+                            <div className="space-y-2">
+                              <Label>Các lựa chọn</Label>
+                              <div className="space-y-2">
+                                {subQ.options?.map((option, optIndex) => (
+                                  <div key={optIndex} className="flex items-center gap-2">
+                                    <div className="flex h-6 w-6 items-center justify-center rounded-full bg-primary text-primary-foreground text-xs font-semibold">
+                                      {String.fromCharCode(65 + optIndex)}
+                                    </div>
+                                    <Input
+                                      placeholder={`Lựa chọn ${String.fromCharCode(65 + optIndex)}`}
+                                      value={option}
+                                      onChange={(e) => {
+                                        const newOptions = [...(subQ.options || [])];
+                                        newOptions[optIndex] = e.target.value;
+                                        handleUpdateSubQuestion(index, 'options', newOptions);
+                                      }}
+                                      className="flex-1"
+                                    />
+                                  </div>
+                                ))}
+                              </div>
+                              
+                              <div className="space-y-2">
+                                <Label>Đáp án đúng</Label>
+                                <Select
+                                  value={subQ.correctAnswer || ''}
+                                  onValueChange={(value) => handleUpdateSubQuestion(index, 'correctAnswer', value)}
+                                >
+                                  <SelectTrigger>
+                                    <SelectValue placeholder="Chọn đáp án đúng" />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    {subQ.options?.map((option, optIndex) => 
+                                      option.trim() ? (
+                                        <SelectItem key={optIndex} value={option}>
+                                          {String.fromCharCode(65 + optIndex)}. {option}
+                                        </SelectItem>
+                                      ) : null
+                                    )}
+                                  </SelectContent>
+                                </Select>
+                              </div>
+                            </div>
+                          )}
+
+                          {/* Đáp án cho các loại câu hỏi khác */}
+                          {subQ.subType !== 'multiple-choice' && (
+                            <div className="space-y-2">
+                              <Label>Đáp án đúng</Label>
+                              <Input
+                                placeholder="Nhập đáp án đúng..."
+                                value={subQ.correctAnswer || ''}
+                                onChange={(e) => handleUpdateSubQuestion(index, 'correctAnswer', e.target.value)}
+                              />
+                            </div>
+                          )}
+
+                          {/* Audio timestamp for listening */}
+                          {question.type === 'listening' && (
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                              <div className="space-y-2">
+                                <Label>Thời gian bắt đầu (giây)</Label>
+                                <Input
+                                  type="number"
+                                  min="0"
+                                  placeholder="0"
+                                  value={subQ.audioTimestamp?.start || ''}
+                                  onChange={(e) => handleUpdateSubQuestion(index, 'audioTimestamp', {
+                                    ...subQ.audioTimestamp,
+                                    start: parseInt(e.target.value) || 0
+                                  })}
+                                />
+                              </div>
+                              <div className="space-y-2">
+                                <Label>Thời gian kết thúc (giây)</Label>
+                                <Input
+                                  type="number"
+                                  min="0"
+                                  placeholder="0"
+                                  value={subQ.audioTimestamp?.end || ''}
+                                  onChange={(e) => handleUpdateSubQuestion(index, 'audioTimestamp', {
+                                    ...subQ.audioTimestamp,
+                                    end: parseInt(e.target.value) || 0
+                                  })}
+                                />
+                              </div>
+                            </div>
+                          )}
+                        </CardContent>
+                      </Card>
+                    ))}
                   </div>
                 )}
               </CardContent>
             </Card>
+          )}
 
-            {/* Multiple Choice Options */}
-            {question.subType.includes('multiple-choice') && (
-              <Card>
-                <CardHeader>
-                  <CardTitle>Các Lựa Chọn</CardTitle>
-                  <CardDescription>
-                    Thêm các lựa chọn cho câu hỏi trắc nghiệm
-                  </CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  {question.options?.map((option, index) => (
-                    <div key={index} className="flex items-center gap-2">
-                      <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary text-primary-foreground text-sm font-semibold">
-                        {String.fromCharCode(65 + index)}
-                      </div>
-                      <Input
-                        placeholder={`Lựa chọn ${String.fromCharCode(65 + index)}`}
-                        value={option}
-                        onChange={(e) => handleOptionChange(index, e.target.value)}
-                        className="flex-1"
-                      />
+          {/* Media Files */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Tệp Đa Phương Tiện</CardTitle>
+              <CardDescription>
+                Thêm file âm thanh hoặc hình ảnh cho câu hỏi
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {/* Audio Upload */}
+                <div className="space-y-2">
+                  <Label className="flex items-center gap-2">
+                    <Volume2 className="h-4 w-4" />
+                    File âm thanh
+                  </Label>
+                  <div className="border-2 border-dashed border-gray-300 rounded-lg p-4 text-center">
+                    <input
+                      type="file"
+                      accept="audio/*"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (file) {
+                          handleQuestionChange('audioFile', file);
+                        }
+                      }}
+                      className="hidden"
+                      id="audio-upload"
+                    />
+                    <label htmlFor="audio-upload" className="cursor-pointer">
+                      <Volume2 className="h-8 w-8 mx-auto text-gray-400 mb-2" />
+                      <p className="text-sm text-gray-600">
+                        {question.audioFile ? question.audioFile.name : 'Chọn file âm thanh'}
+                      </p>
+                    </label>
+                    {question.audioFile && (
                       <Button
                         variant="ghost"
                         size="sm"
-                        onClick={() => handleRemoveOption(index)}
-                        className="text-red-600 hover:text-red-700"
+                        onClick={() => handleQuestionChange('audioFile', null)}
+                        className="mt-2 text-red-600"
                       >
-                        <Trash2 className="h-4 w-4" />
+                        <X className="h-4 w-4 mr-1" />
+                        Xóa
                       </Button>
-                    </div>
-                  ))}
-                  
-                  <Button
-                    variant="outline"
-                    onClick={handleAddOption}
-                    className="w-full"
-                  >
-                    <Plus className="h-4 w-4 mr-2" />
-                    Thêm lựa chọn
-                  </Button>
-
-                  <div className="space-y-2">
-                    <Label>Đáp án đúng</Label>
-                    <Select
-                      value={question.correctAnswer || ''}
-                      onValueChange={(value) => handleQuestionChange('correctAnswer', value)}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Chọn đáp án đúng" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {question.options?.map((option, index) => 
-                          option.trim() ? (
-                            <SelectItem key={index} value={option}>
-                              {String.fromCharCode(65 + index)}. {option}
-                            </SelectItem>
-                          ) : null
-                        )}
-                      </SelectContent>
-                    </Select>
+                    )}
                   </div>
-                </CardContent>
-              </Card>
-            )}
+                </div>
 
-            {/* Composite Questions */}
-            {question.isComposite && (
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <Plus className="h-4 w-4" />
-                    Câu Hỏi Con (Sub-Questions)
-                  </CardTitle>
-                  <CardDescription>
-                    Thêm các câu hỏi con cho composite question
-                  </CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-4 max-h-96 overflow-y-auto">
-                  {question.subQuestions?.map((subQ, index) => (
-                    <Card key={index} className="border-l-4 border-l-blue-500">
-                      <CardHeader className="pb-3">
-                        <div className="flex items-center justify-between">
-                          <CardTitle className="text-lg">
-                            Câu hỏi con {subQ.subQuestionNumber}
-                          </CardTitle>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => handleRemoveSubQuestion(index)}
-                            className="text-red-600 hover:text-red-700"
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      </CardHeader>
-                      <CardContent className="space-y-4">
-                        <div className="space-y-2">
-                          <Label>Nội dung câu hỏi con</Label>
-                          <Textarea
-                            placeholder="Nhập nội dung câu hỏi con..."
-                            value={subQ.question}
-                            onChange={(e) => handleUpdateSubQuestion(index, 'question', e.target.value)}
-                            rows={2}
-                          />
-                        </div>
-
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                          <div className="space-y-2">
-                            <Label>Điểm số</Label>
-                            <Input
-                              type="number"
-                              min="1"
-                              value={subQ.points}
-                              onChange={(e) => handleUpdateSubQuestion(index, 'points', parseInt(e.target.value) || 1)}
-                            />
-                          </div>
-                          <div className="space-y-2">
-                            <Label>Giải thích (tùy chọn)</Label>
-                            <Input
-                              placeholder="Giải thích đáp án..."
-                              value={subQ.explanation || ''}
-                              onChange={(e) => handleUpdateSubQuestion(index, 'explanation', e.target.value)}
-                            />
-                          </div>
-                        </div>
-
-                        {/* Sub-question options */}
-                        <div className="space-y-2">
-                          <Label>Các lựa chọn (nếu có)</Label>
-                          <div className="space-y-2">
-                            {subQ.options?.map((option, optIndex) => (
-                              <div key={optIndex} className="flex items-center gap-2">
-                                <div className="flex h-6 w-6 items-center justify-center rounded-full bg-primary text-primary-foreground text-xs font-semibold">
-                                  {String.fromCharCode(65 + optIndex)}
-                                </div>
-                                <Input
-                                  placeholder={`Lựa chọn ${String.fromCharCode(65 + optIndex)}`}
-                                  value={option}
-                                  onChange={(e) => {
-                                    const newOptions = [...(subQ.options || [])];
-                                    newOptions[optIndex] = e.target.value;
-                                    handleUpdateSubQuestion(index, 'options', newOptions);
-                                  }}
-                                  className="flex-1"
-                                />
-                              </div>
-                            ))}
-                          </div>
-                          
-                          <div className="space-y-2">
-                            <Label>Đáp án đúng</Label>
-                            <Input
-                              placeholder="Nhập đáp án đúng..."
-                              value={subQ.correctAnswer || ''}
-                              onChange={(e) => handleUpdateSubQuestion(index, 'correctAnswer', e.target.value)}
-                            />
-                          </div>
-                        </div>
-
-                        {/* Audio timestamp for listening */}
-                        {question.type === 'listening' && (
-                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                            <div className="space-y-2">
-                              <Label>Thời gian bắt đầu (giây)</Label>
-                              <Input
-                                type="number"
-                                min="0"
-                                placeholder="0"
-                                value={subQ.audioTimestamp?.start || ''}
-                                onChange={(e) => handleUpdateSubQuestion(index, 'audioTimestamp', {
-                                  ...subQ.audioTimestamp,
-                                  start: parseInt(e.target.value) || 0
-                                })}
-                              />
-                            </div>
-                            <div className="space-y-2">
-                              <Label>Thời gian kết thúc (giây)</Label>
-                              <Input
-                                type="number"
-                                min="0"
-                                placeholder="0"
-                                value={subQ.audioTimestamp?.end || ''}
-                                onChange={(e) => handleUpdateSubQuestion(index, 'audioTimestamp', {
-                                  ...subQ.audioTimestamp,
-                                  end: parseInt(e.target.value) || 0
-                                })}
-                              />
-                            </div>
-                          </div>
-                        )}
-                      </CardContent>
-                    </Card>
-                  ))}
-
-                  <Button
-                    variant="outline"
-                    onClick={handleAddSubQuestion}
-                    className="w-full"
-                  >
-                    <Plus className="h-4 w-4 mr-2" />
-                    Thêm Câu Hỏi Con
-                  </Button>
-                </CardContent>
-              </Card>
-            )}
-
-            {/* Media Files */}
-            <Card>
-              <CardHeader>
-                <CardTitle>Tệp Đa Phương Tiện</CardTitle>
-                <CardDescription>
-                  Thêm file âm thanh hoặc hình ảnh cho câu hỏi
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <Tabs defaultValue="audio" className="w-full">
-                  <TabsList className="grid w-full grid-cols-2">
-                    <TabsTrigger value="audio" className="flex items-center gap-2">
-                      <Volume2 className="h-4 w-4" />
-                      Âm thanh
-                    </TabsTrigger>
-                    <TabsTrigger value="image" className="flex items-center gap-2">
-                      <ImageIcon className="h-4 w-4" />
-                      Hình ảnh
-                    </TabsTrigger>
-                  </TabsList>
-                  
-                  <TabsContent value="audio">
-                    <AudioUpload
-                      value=""
-                      onChange={() => {}}
-                      onFileChange={(file) => handleQuestionChange('audioFile', file)}
-                      selectedFile={question.audioFile}
+                {/* Image Upload */}
+                <div className="space-y-2">
+                  <Label className="flex items-center gap-2">
+                    <ImageIcon className="h-4 w-4" />
+                    File hình ảnh
+                  </Label>
+                  <div className="border-2 border-dashed border-gray-300 rounded-lg p-4 text-center">
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (file) {
+                          handleQuestionChange('imageFile', file);
+                        }
+                      }}
+                      className="hidden"
+                      id="image-upload"
                     />
-                  </TabsContent>
-                  
-                  <TabsContent value="image">
-                    <ImageUpload
-                      value=""
-                      onChange={() => {}}
-                      onFileChange={(file) => handleQuestionChange('imageFile', file)}
-                      selectedFile={question.imageFile}
-                    />
-                  </TabsContent>
-                </Tabs>
-              </CardContent>
-            </Card>
-          </div>
+                    <label htmlFor="image-upload" className="cursor-pointer">
+                      <ImageIcon className="h-8 w-8 mx-auto text-gray-400 mb-2" />
+                      <p className="text-sm text-gray-600">
+                        {question.imageFile ? question.imageFile.name : 'Chọn file hình ảnh'}
+                      </p>
+                    </label>
+                    {question.imageFile && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handleQuestionChange('imageFile', null)}
+                        className="mt-2 text-red-600"
+                      >
+                        <X className="h-4 w-4 mr-1" />
+                        Xóa
+                      </Button>
+                    )}
+                  </div>
+                </div>
+              </div>
 
-          {/* Sidebar */}
-          <div className="xl:col-span-1 lg:col-span-1 space-y-6">
-            <div className="sticky top-24 space-y-6">
+              {/* File Info */}
+              {(question.audioFile || question.imageFile) && (
+                <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                  <h4 className="font-medium text-blue-900 mb-2">Thông tin file:</h4>
+                  <div className="space-y-1 text-sm text-blue-700">
+                    {question.audioFile && (
+                      <p>• Âm thanh: {question.audioFile.name} ({(question.audioFile.size / 1024 / 1024).toFixed(2)} MB)</p>
+                    )}
+                    {question.imageFile && (
+                      <p>• Hình ảnh: {question.imageFile.name} ({(question.imageFile.size / 1024 / 1024).toFixed(2)} MB)</p>
+                    )}
+                  </div>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Sidebar */}
+        <div className="lg:col-span-1 space-y-6">
+          <div className="sticky top-24 space-y-6">
             {/* Question Settings */}
             <Card>
               <CardHeader>
@@ -801,7 +981,7 @@ export default function CreateTestQuestionsPage() {
                       <SelectItem value="hard">Khó</SelectItem>
                     </SelectContent>
                   </Select>
-              </div>
+                </div>
 
                 <div className="space-y-2">
                   <Label htmlFor="points">Điểm số</Label>
@@ -812,7 +992,7 @@ export default function CreateTestQuestionsPage() {
                     value={question.points}
                     onChange={(e) => handleQuestionChange('points', parseInt(e.target.value) || 1)}
                   />
-            </div>
+                </div>
 
                 {question.type === 'writing' && (
                   <div className="space-y-2">
@@ -824,22 +1004,22 @@ export default function CreateTestQuestionsPage() {
                       placeholder="Ví dụ: 250"
                       value={question.wordLimit || ''}
                       onChange={(e) => handleQuestionChange('wordLimit', parseInt(e.target.value) || undefined)}
-              />
-            </div>
+                    />
+                  </div>
                 )}
 
-                {question.subType.includes('completion') && (
+                {question.subType === 'fill-blank' && (
                   <div className="space-y-2">
                     <Label htmlFor="blanksCount">Số chỗ trống</Label>
                     <Input
                       id="blanksCount"
-                type="number"
+                      type="number"
                       min="1"
                       placeholder="Ví dụ: 3"
                       value={question.blanksCount || ''}
                       onChange={(e) => handleQuestionChange('blanksCount', parseInt(e.target.value) || undefined)}
-              />
-            </div>
+                    />
+                  </div>
                 )}
 
                 <div className="space-y-2">
@@ -859,6 +1039,7 @@ export default function CreateTestQuestionsPage() {
                     </SelectContent>
                   </Select>
                 </div>
+
               </CardContent>
             </Card>
 
@@ -896,7 +1077,7 @@ export default function CreateTestQuestionsPage() {
                       </button>
                     </Badge>
                   ))}
-            </div>
+                </div>
               </CardContent>
             </Card>
 
@@ -923,7 +1104,6 @@ export default function CreateTestQuestionsPage() {
                 </Button>
               </CardContent>
             </Card>
-            </div>
           </div>
         </div>
       </div>

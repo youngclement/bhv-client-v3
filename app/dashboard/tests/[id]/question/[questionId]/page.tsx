@@ -493,7 +493,7 @@ export default function EditQuestionPage() {
                       const formData = new FormData();
                       formData.append('file', file);
                       formData.append('type', 'image');
-                      const res = await fetch('/api/upload', { method: 'POST', body: formData });
+                      const res = await fetch('/upload', { method: 'POST', body: formData });
                       const result = await res.json();
                       if (result.success) setQuestion({ ...question, imageFile: result.url });
                     }}
