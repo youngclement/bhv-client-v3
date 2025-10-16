@@ -348,56 +348,30 @@ export default function TakeTestPage() {
     }
   };
 
-  const startSubmission = async (testId: string, assignmentId: string) => {
+  // Backend API: POST /api/submissions/:testId/start
+  const startSubmission = async (testId: string, assignmentId?: string) => {
     try {
-      const response = await authService.startSubmission(testId, assignmentId);
-      return response;
-    } catch (error) {
-      console.error('Failed to start submission:', error);
-      // Try alternative approach
-      try {
-        const response = await authService.apiRequest(`/submissions/start/${testId}`, {
-          method: 'POST',
-          body: JSON.stringify({ assignmentId })
-        });
-        return response;
-      } catch (fallbackError) {
-        console.error('Fallback start submission also failed:', fallbackError);
-        throw fallbackError;
-      }
-    }
-  };
-
-  const startSubmissionFallback = async (testId: string, assignmentId: string) => {
-    try {
-      const response = await authService.apiRequest(`/submissions/start/${testId}`, {
-        method: 'POST',
-        body: JSON.stringify({ assignmentId })
-      });
-      return response;
+      return await authService.startSubmission(testId, assignmentId);
     } catch (error) {
       console.error('Failed to start submission:', error);
       throw error;
     }
   };
 
+  // Backend API: PUT /api/submissions/:submissionId/answer
   const saveAnswer = useCallback(async (questionId: string, answer: string) => {
     if (!submissionId) return;
 
     setSaving(true);
     try {
-      const timeSpent = Math.floor((Date.now() - questionStartTime) / 1000);
-
-      await authService.apiRequest(`/submissions/answer/${submissionId}`, {
-        method: 'POST',
-        body: JSON.stringify({ questionId, answer, timeSpent })
-      });
+      // Use updated authService method
+      await authService.saveAnswer(submissionId, questionId, answer);
     } catch (error) {
       console.error('Failed to save answer:', error);
     } finally {
       setSaving(false);
     }
-  }, [submissionId, questionStartTime]);
+  }, [submissionId]);
 
   const handleAnswerChange = (questionId: string, answer: string) => {
     setAnswers(prev => ({ ...prev, [questionId]: answer }));
@@ -444,10 +418,8 @@ export default function TakeTestPage() {
     if (!submissionId) return;
 
     try {
-      await authService.apiRequest(`/submissions/submit/${submissionId}`, {
-        method: 'POST'
-      });
-
+      // Use updated authService method - POST /api/submissions/:submissionId/submit
+      await authService.submitTest(submissionId);
       router.push(`/submissions/results/${submissionId}`);
     } catch (error) {
       console.error('Failed to submit test:', error);
@@ -699,7 +671,7 @@ export default function TakeTestPage() {
                       Q{currentQuestion?.number || (currentQuestionIndex + 1)}
                     </Badge>
                     <Badge variant="secondary" className="capitalize bg-slate-200 text-slate-700 font-medium">
-                      {(currentQuestion?.subType || currentQuestion?.type).replace('-', ' ')}
+                      {((currentQuestion?.subType || currentQuestion?.type) || 'unknown').replace(/-/g, ' ')}
                     </Badge>
                     <span className="text-sm text-slate-600 font-normal">
                       {currentQuestion?.points || 1} point{(currentQuestion?.points || 1) > 1 ? 's' : ''}

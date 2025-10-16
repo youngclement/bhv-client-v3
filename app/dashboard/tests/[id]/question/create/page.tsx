@@ -34,10 +34,10 @@ import {
 } from 'lucide-react';
 import { authService } from '@/lib/auth';
 
+// Backend: SubQuestions DO NOT have subType field
 interface SubQuestion {
   subQuestionNumber: number;
   question: string;
-  subType: string; // Thêm subType cho sub-question
   options?: string[];
   correctAnswer?: any; // Schema.Types.Mixed
   points: number;
@@ -48,11 +48,12 @@ interface SubQuestion {
   };
 }
 
+// Backend: Main interface matching API schema
 interface Question {
   testId?: string;
   questionNumber?: number;
-  type: 'reading' | 'listening' | 'writing' | 'speaking' | 'full';
-  subType: string;
+  testType: 'reading' | 'listening' | 'writing' | 'speaking' | 'full-test'; // Changed from 'type' to 'testType'
+  subType: 'multiple-choice' | 'fill-blank' | 'matching' | 'short-answer' | 'composite'; // Only 5 types
   question: string;
   instructionText?: string;
   passage?: string;
@@ -72,43 +73,46 @@ interface Question {
   subQuestions?: SubQuestion[];
   createdBy?: string;
   isActive?: boolean;
+  isAutoGraded?: boolean; // Backend: Auto-grading flag
+  markingType?: 'auto' | 'manual'; // Backend: Marking type
 }
 
+// Backend: Only 5 supported question types
 const questionTypes = {
   reading: [
-    { value: 'multiple-choice', label: 'Multiple Choice' },
-    { value: 'fill-blank', label: 'Fill in the Blank' },
-    { value: 'matching', label: 'Matching' },
-    { value: 'short-answer', label: 'Short Answer' },
-    { value: 'composite', label: 'Composite Question (có sub-questions)' },
+    { value: 'multiple-choice' as const, label: 'Multiple Choice' },
+    { value: 'fill-blank' as const, label: 'Fill in the Blank' },
+    { value: 'matching' as const, label: 'Matching' },
+    { value: 'short-answer' as const, label: 'Short Answer' },
+    { value: 'composite' as const, label: 'Composite Question (có sub-questions)' },
   ],
   listening: [
-    { value: 'multiple-choice', label: 'Multiple Choice' },
-    { value: 'fill-blank', label: 'Fill in the Blank' },
-    { value: 'matching', label: 'Matching' },
-    { value: 'short-answer', label: 'Short Answer' },
-    { value: 'composite', label: 'Composite Question (có sub-questions)' },
+    { value: 'multiple-choice' as const, label: 'Multiple Choice' },
+    { value: 'fill-blank' as const, label: 'Fill in the Blank' },
+    { value: 'matching' as const, label: 'Matching' },
+    { value: 'short-answer' as const, label: 'Short Answer' },
+    { value: 'composite' as const, label: 'Composite Question (có sub-questions)' },
   ],
   writing: [
-    { value: 'multiple-choice', label: 'Multiple Choice' },
-    { value: 'fill-blank', label: 'Fill in the Blank' },
-    { value: 'matching', label: 'Matching' },
-    { value: 'short-answer', label: 'Short Answer' },
-    { value: 'composite', label: 'Composite Question (có sub-questions)' },
+    { value: 'multiple-choice' as const, label: 'Multiple Choice' },
+    { value: 'fill-blank' as const, label: 'Fill in the Blank' },
+    { value: 'matching' as const, label: 'Matching' },
+    { value: 'short-answer' as const, label: 'Short Answer' },
+    { value: 'composite' as const, label: 'Composite Question (có sub-questions)' },
   ],
   speaking: [
-    { value: 'multiple-choice', label: 'Multiple Choice' },
-    { value: 'fill-blank', label: 'Fill in the Blank' },
-    { value: 'matching', label: 'Matching' },
-    { value: 'short-answer', label: 'Short Answer' },
-    { value: 'composite', label: 'Composite Question (có sub-questions)' },
+    { value: 'multiple-choice' as const, label: 'Multiple Choice' },
+    { value: 'fill-blank' as const, label: 'Fill in the Blank' },
+    { value: 'matching' as const, label: 'Matching' },
+    { value: 'short-answer' as const, label: 'Short Answer' },
+    { value: 'composite' as const, label: 'Composite Question (có sub-questions)' },
   ],
-  full: [
-    { value: 'multiple-choice', label: 'Multiple Choice' },
-    { value: 'fill-blank', label: 'Fill in the Blank' },
-    { value: 'matching', label: 'Matching' },
-    { value: 'short-answer', label: 'Short Answer' },
-    { value: 'composite', label: 'Composite Question (có sub-questions)' },
+  'full-test': [
+    { value: 'multiple-choice' as const, label: 'Multiple Choice' },
+    { value: 'fill-blank' as const, label: 'Fill in the Blank' },
+    { value: 'matching' as const, label: 'Matching' },
+    { value: 'short-answer' as const, label: 'Short Answer' },
+    { value: 'composite' as const, label: 'Composite Question (có sub-questions)' },
   ],
 };
 
@@ -119,7 +123,7 @@ export default function CreateTestQuestionsPage() {
 
   const [question, setQuestion] = useState<Question>({
     testId: testId,
-    type: 'reading',
+    testType: 'reading', // Changed from 'type' to 'testType'
     subType: 'multiple-choice',
     question: '',
     instructionText: '',
@@ -132,6 +136,7 @@ export default function CreateTestQuestionsPage() {
     allowSubQuestions: false,
     subQuestions: [],
     isActive: true,
+    isAutoGraded: true, // Default to auto-graded
   });
 
   const [loading, setLoading] = useState(false);
@@ -148,32 +153,38 @@ export default function CreateTestQuestionsPage() {
     }));
   };
 
-  const handleTypeChange = (type: 'reading' | 'listening' | 'writing') => {
+  const handleTypeChange = (testType: 'reading' | 'listening' | 'writing' | 'speaking' | 'full-test') => {
     setQuestion(prev => ({
       ...prev,
-      type,
-      subType: questionTypes[type][0].value
+      testType, // Changed from 'type' to 'testType'
+      subType: questionTypes[testType][0].value
     }));
   };
 
-  const handleSubTypeChange = (subType: string) => {
+  const handleSubTypeChange = (subType: 'multiple-choice' | 'fill-blank' | 'matching' | 'short-answer' | 'composite') => {
     const isComposite = subType === 'composite';
+    // Backend: Determine if auto-graded based on subType
+    const isAutoGraded = subType !== 'short-answer'; // short-answer requires manual grading
+    const markingType = isAutoGraded ? 'auto' : 'manual';
+    
     setQuestion(prev => ({
       ...prev,
       subType,
       isComposite,
       hasSubQuestions: isComposite,
       allowSubQuestions: isComposite,
-      subQuestions: isComposite ? prev.subQuestions || [] : []
+      subQuestions: isComposite ? prev.subQuestions || [] : [],
+      isAutoGraded,
+      markingType
     }));
   };
 
   const handleAddSubQuestion = () => {
+    // Backend: SubQuestions DO NOT have subType field
     const newSubQuestion: SubQuestion = {
       subQuestionNumber: (question.subQuestions?.length || 0) + 1,
       question: '',
-      subType: 'multiple-choice', // Mặc định là multiple-choice
-      options: ['', '', '', ''],
+      options: ['', '', '', ''], // For multiple-choice options
       correctAnswer: '',
       points: 1,
       explanation: ''
@@ -261,7 +272,7 @@ export default function CreateTestQuestionsPage() {
       setError('Điểm số phải lớn hơn 0');
       return false;
     }
-    if (question.type === 'writing' && !question.wordLimit) {
+    if (question.testType === 'writing' && !question.wordLimit) {
       setError('Vui lòng nhập giới hạn từ cho câu hỏi Writing');
       return false;
     }
@@ -300,15 +311,12 @@ export default function CreateTestQuestionsPage() {
           setError(`Vui lòng nhập nội dung cho câu hỏi con ${i + 1}`);
           return false;
         }
-        if (!subQ.subType) {
-          setError(`Vui lòng chọn loại câu hỏi cho câu hỏi con ${i + 1}`);
-          return false;
-        }
         if (subQ.points < 1) {
           setError(`Điểm số cho câu hỏi con ${i + 1} phải lớn hơn 0`);
           return false;
         }
-        if (subQ.subType === 'multiple-choice') {
+        // Backend: SubQuestions don't have subType, but we validate options if present
+        if (subQ.options && subQ.options.length > 0) {
           const validSubOptions = sanitizeOptions(subQ.options);
           if (validSubOptions.length < 2) {
             setError(`Vui lòng thêm ít nhất 2 lựa chọn cho câu hỏi con ${i + 1}`);
@@ -334,16 +342,18 @@ export default function CreateTestQuestionsPage() {
     setSuccess('');
 
     try {
-      // Prepare question data according to API format
+      // Backend: API expects 'testType' not 'type'
       const questionData = {
         testId: question.testId,
-        type: question.type,
+        testType: question.testType, // Changed from 'type' to 'testType'
         subType: question.subType,
         question: question.question,
         points: question.points,
         hasSubQuestions: question.hasSubQuestions || false,
         allowSubQuestions: question.allowSubQuestions || false,
         subQuestions: question.subQuestions || [],
+        isAutoGraded: question.isAutoGraded,
+        markingType: question.markingType,
         // Optional fields
         instructionText: question.instructionText,
         passage: question.passage,
@@ -364,7 +374,7 @@ export default function CreateTestQuestionsPage() {
       if (hasFiles) {
         // Use FormData for file uploads
         const formData = new FormData();
-        formData.append('question', JSON.stringify(questionData));
+        formData.append('question', JSON.stringify(questionData));  
         
         if (question.audioFile) {
           formData.append('audioFile', question.audioFile);
@@ -393,7 +403,7 @@ export default function CreateTestQuestionsPage() {
       // Reset form
       setQuestion({
         testId: testId,
-        type: 'reading',
+        testType: 'reading', // Changed from 'type'
         subType: 'multiple-choice',
         question: '',
         instructionText: '',
@@ -406,6 +416,7 @@ export default function CreateTestQuestionsPage() {
         allowSubQuestions: false,
         subQuestions: [],
         isActive: true,
+        isAutoGraded: true,
       });
 
       // Redirect to test builder after a short delay
@@ -472,7 +483,7 @@ export default function CreateTestQuestionsPage() {
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
-                {getTypeIcon(question.type)}
+                {getTypeIcon(question.testType)}
                 Loại Câu Hỏi
               </CardTitle>
               <CardDescription>
@@ -484,7 +495,7 @@ export default function CreateTestQuestionsPage() {
                 {Object.entries(questionTypes).map(([type, subtypes]) => (
                   <Button
                     key={type}
-                    variant={question.type === type ? "default" : "outline"}
+                    variant={question.testType === type ? "default" : "outline"}
                     onClick={() => handleTypeChange(type as any)}
                     className="h-auto p-4 flex flex-col items-center gap-2"
                   >
@@ -501,10 +512,10 @@ export default function CreateTestQuestionsPage() {
                   onValueChange={handleSubTypeChange}
                 >
                   <SelectTrigger>
-                    <SelectValue placeholder="Chọn loại câu hỏi" />
+                    <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    {questionTypes[question.type].map((subtype) => (
+                    {questionTypes[question.testType].map((subtype) => (
                       <SelectItem key={subtype.value} value={subtype.value}>
                         {subtype.label}
                       </SelectItem>
@@ -512,26 +523,6 @@ export default function CreateTestQuestionsPage() {
                   </SelectContent>
                 </Select>
               </div>
-
-              {/* Composite Question Info */}
-              {question.subType === 'composite' && (
-                <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
-                  <div className="flex items-start gap-3">
-                    <div className="flex-shrink-0">
-                      <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
-                        <Plus className="h-4 w-4 text-blue-600" />
-                      </div>
-                    </div>
-                    <div className="flex-1">
-                      <h4 className="font-medium text-blue-900 mb-1">Composite Question</h4>
-                      <p className="text-sm text-blue-700">
-                        Loại câu hỏi này cho phép bạn tạo nhiều câu hỏi con trong một câu hỏi chính. 
-                        Mỗi câu hỏi con có thể có điểm số và đáp án riêng.
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              )}
             </CardContent>
           </Card>
 
@@ -567,7 +558,7 @@ export default function CreateTestQuestionsPage() {
                 />
               </div>
 
-              {question.type === 'reading' && (
+              {question.testType === 'reading' && (
                 <div className="space-y-2">
                   <Label htmlFor="passage">Đoạn văn (tùy chọn)</Label>
                   <Textarea
@@ -702,25 +693,7 @@ export default function CreateTestQuestionsPage() {
                           </div>
                         </CardHeader>
                         <CardContent className="space-y-4">
-                          <div className="space-y-2">
-                            <Label>Loại câu hỏi con</Label>
-                            <Select
-                              value={subQ.subType}
-                              onValueChange={(value) => handleUpdateSubQuestion(index, 'subType', value)}
-                            >
-                              <SelectTrigger>
-                                <SelectValue placeholder="Chọn loại câu hỏi" />
-                              </SelectTrigger>
-                               <SelectContent>
-                                 <SelectItem value="multiple-choice">Multiple Choice</SelectItem>
-                                 <SelectItem value="fill-blank">Fill in the Blank</SelectItem>
-                                 <SelectItem value="matching">Matching</SelectItem>
-                                 <SelectItem value="short-answer">Short Answer</SelectItem>
-                                 <SelectItem value="composite">Composite Question</SelectItem>
-                               </SelectContent>
-                            </Select>
-                          </div>
-
+                          {/* Backend: SubQuestions don't have subType field */}
                           <div className="space-y-2">
                             <Label>Nội dung câu hỏi con</Label>
                             <Textarea
@@ -751,55 +724,54 @@ export default function CreateTestQuestionsPage() {
                             </div>
                           </div>
 
-                          {/* Sub-question options - chỉ hiển thị cho multiple-choice */}
-                          {subQ.subType === 'multiple-choice' && (
+                          {/* Backend: SubQuestions can have options (for multiple-choice style) */}
+                          {/* Show options input - user decides if needed */}
+                          <div className="space-y-2">
+                            <Label>Các lựa chọn (tùy chọn - dành cho dạng trắc nghiệm)</Label>
                             <div className="space-y-2">
-                              <Label>Các lựa chọn</Label>
-                              <div className="space-y-2">
-                                {subQ.options?.map((option, optIndex) => (
-                                  <div key={optIndex} className="flex items-center gap-2">
-                                    <div className="flex h-6 w-6 items-center justify-center rounded-full bg-primary text-primary-foreground text-xs font-semibold">
-                                      {String.fromCharCode(65 + optIndex)}
-                                    </div>
-                                    <Input
-                                      placeholder={`Lựa chọn ${String.fromCharCode(65 + optIndex)}`}
-                                      value={option}
-                                      onChange={(e) => {
-                                        const newOptions = [...(subQ.options || [])];
-                                        newOptions[optIndex] = e.target.value;
-                                        handleUpdateSubQuestion(index, 'options', newOptions);
-                                      }}
-                                      className="flex-1"
-                                    />
+                              {subQ.options?.map((option, optIndex) => (
+                                <div key={optIndex} className="flex items-center gap-2">
+                                  <div className="flex h-6 w-6 items-center justify-center rounded-full bg-primary text-primary-foreground text-xs font-semibold">
+                                    {String.fromCharCode(65 + optIndex)}
                                   </div>
-                                ))}
-                              </div>
-                              
-                              <div className="space-y-2">
-                                <Label>Đáp án đúng</Label>
-                                <Select
-                                  value={subQ.correctAnswer || ''}
-                                  onValueChange={(value) => handleUpdateSubQuestion(index, 'correctAnswer', value)}
-                                >
-                                  <SelectTrigger>
-                                    <SelectValue placeholder="Chọn đáp án đúng" />
-                                  </SelectTrigger>
-                                  <SelectContent>
-                                    {subQ.options?.map((option, optIndex) => 
-                                      option.trim() ? (
-                                        <SelectItem key={optIndex} value={option}>
-                                          {String.fromCharCode(65 + optIndex)}. {option}
-                                        </SelectItem>
-                                      ) : null
-                                    )}
-                                  </SelectContent>
-                                </Select>
-                              </div>
+                                  <Input
+                                    placeholder={`Lựa chọn ${String.fromCharCode(65 + optIndex)}`}
+                                    value={option}
+                                    onChange={(e) => {
+                                      const newOptions = [...(subQ.options || [])];
+                                      newOptions[optIndex] = e.target.value;
+                                      handleUpdateSubQuestion(index, 'options', newOptions);
+                                    }}
+                                    className="flex-1"
+                                  />
+                                </div>
+                              ))}
                             </div>
-                          )}
+                          </div>
 
-                          {/* Đáp án cho các loại câu hỏi khác */}
-                          {subQ.subType !== 'multiple-choice' && (
+                          {/* Correct answer selection */}
+                          {subQ.options && subQ.options.length > 0 && subQ.options.some(o => o.trim()) ? (
+                            <div className="space-y-2">
+                              <Label>Đáp án đúng</Label>
+                              <Select
+                                value={subQ.correctAnswer || ''}
+                                onValueChange={(value) => handleUpdateSubQuestion(index, 'correctAnswer', value)}
+                              >
+                                <SelectTrigger>
+                                  <SelectValue placeholder="Chọn đáp án đúng" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {subQ.options?.map((option, optIndex) => 
+                                    option.trim() ? (
+                                      <SelectItem key={optIndex} value={option}>
+                                        {String.fromCharCode(65 + optIndex)}. {option}
+                                      </SelectItem>
+                                    ) : null
+                                  )}
+                                </SelectContent>
+                              </Select>
+                            </div>
+                          ) : (
                             <div className="space-y-2">
                               <Label>Đáp án đúng</Label>
                               <Input
@@ -811,7 +783,7 @@ export default function CreateTestQuestionsPage() {
                           )}
 
                           {/* Audio timestamp for listening */}
-                          {question.type === 'listening' && (
+                          {question.testType === 'listening' && (
                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                               <div className="space-y-2">
                                 <Label>Thời gian bắt đầu (giây)</Label>
@@ -994,7 +966,7 @@ export default function CreateTestQuestionsPage() {
                   />
                 </div>
 
-                {question.type === 'writing' && (
+                {question.testType === 'writing' && (
                   <div className="space-y-2">
                     <Label htmlFor="wordLimit">Giới hạn từ</Label>
                     <Input

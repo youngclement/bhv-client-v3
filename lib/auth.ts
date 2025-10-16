@@ -140,22 +140,29 @@ class AuthService {
     }
   }
 
-  async startSubmission(testId: string, assignmentId: string): Promise<any> {
-    return this.apiRequest(`/submissions/start/${testId}`, {
+  // Backend API: POST /api/submissions/:testId/start
+  async startSubmission(testId: string, assignmentId?: string): Promise<any> {
+    const body: any = {};
+    if (assignmentId) {
+      body.assignmentId = assignmentId;
+    }
+    return this.apiRequest(`/submissions/${testId}/start`, {
       method: 'POST',
-      body: JSON.stringify({ assignmentId })
+      body: JSON.stringify(body)
     });
   }
 
-  async saveAnswer(submissionId: string, questionId: string, answer: string, timeSpent: number): Promise<any> {
-    return this.apiRequest(`/submissions/answer/${submissionId}`, {
-      method: 'POST',
-      body: JSON.stringify({ questionId, answer, timeSpent })
+  // Backend API: PUT /api/submissions/:submissionId/answer
+  async saveAnswer(submissionId: string, questionId: string, answer: any): Promise<any> {
+    return this.apiRequest(`/submissions/${submissionId}/answer`, {
+      method: 'PUT',
+      body: JSON.stringify({ questionId, answer })
     });
   }
 
+  // Backend API: POST /api/submissions/:submissionId/submit
   async submitTest(submissionId: string): Promise<any> {
-    return this.apiRequest(`/submissions/submit/${submissionId}`, {
+    return this.apiRequest(`/submissions/${submissionId}/submit`, {
       method: 'POST'
     });
   }
