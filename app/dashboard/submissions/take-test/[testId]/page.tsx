@@ -73,6 +73,16 @@ interface Question {
   section?: number;
   answer?: string;
   timeSpent?: number;
+  // Sub-questions support
+  subQuestions?: Array<{
+    _id?: string;
+    type: 'text' | 'multiple-choice' | 'true-false' | 'matching';
+    question: string;
+    options?: string[];
+    correctAnswer?: string;
+    answer?: string;
+    points?: number;
+  }>;
 }
 
 interface Test {
