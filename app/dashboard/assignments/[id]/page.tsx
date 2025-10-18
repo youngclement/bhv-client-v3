@@ -50,14 +50,38 @@ interface Assignment {
     title: string;
     type: string;
     duration: number;
+    totalPoints?: number;
   };
-  studentIds: string[];
+  assignedBy?: {
+    _id: string;
+    firstName: string;
+    lastName: string;
+  };
+  studentIds: Array<{
+    _id: string;
+    firstName: string;
+    lastName: string;
+    email: string;
+    completionStatus: 'completed' | 'in-progress' | 'overdue' | 'pending';
+    isOverdue: boolean;
+    submissionId?: string;
+    score?: number;
+    submittedAt?: string;
+  }>;
   students?: {
     _id: string;
     firstName: string;
     lastName: string;
     email: string;
   }[];
+  completionStats?: {
+    totalStudents: number;
+    completed: number;
+    inProgress: number;
+    overdue: number;
+    pending: number;
+    completionRate: number;
+  };
   dueDate: string;
   isActive: boolean;
   createdAt: string;
@@ -104,7 +128,7 @@ export default function AssignmentDetailPage() {
 
   const fetchAssignment = async (id: string) => {
     try {
-      const data = await authService.apiRequest(`/assignments/${id}`);
+      const data = await authService.apiRequest(`/assignments/${id}?populate=students`);
       setAssignment(data);
       setEditData({
         ...data,
@@ -179,6 +203,46 @@ export default function AssignmentDetailPage() {
     }
   };
 
+  const getStudentStatusBadge = (status: string, score?: number) => {
+    switch (status) {
+      case 'completed':
+        return (
+          <div className="flex items-center gap-2">
+            <Badge className="bg-green-100 text-green-800">
+              <CheckCircle className="h-3 w-3 mr-1" />
+              Completed
+            </Badge>
+            {score !== undefined && (
+              <Badge variant="secondary">{score}%</Badge>
+            )}
+          </div>
+        );
+      case 'in-progress':
+        return (
+          <Badge className="bg-yellow-100 text-yellow-800">
+            <Clock className="h-3 w-3 mr-1" />
+            In Progress
+          </Badge>
+        );
+      case 'overdue':
+        return (
+          <Badge className="bg-red-100 text-red-800">
+            <AlertCircle className="h-3 w-3 mr-1" />
+            Overdue
+          </Badge>
+        );
+      case 'pending':
+        return (
+          <Badge className="bg-gray-100 text-gray-800">
+            <Clock className="h-3 w-3 mr-1" />
+            Pending
+          </Badge>
+        );
+      default:
+        return null;
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
@@ -203,9 +267,9 @@ export default function AssignmentDetailPage() {
   }
 
   const statusInfo = getAssignmentStatus(assignment);
-  const completedCount = assignment.submissions?.length || 0;
-  const totalStudents = assignment.studentIds.length;
-  const progressPercentage = totalStudents > 0 ? (completedCount / totalStudents) * 100 : 0;
+  const completedCount = assignment.completionStats?.completed || assignment.submissions?.length || 0;
+  const totalStudents = assignment.completionStats?.totalStudents || assignment.studentIds.length;
+  const progressPercentage = assignment.completionStats?.completionRate || (totalStudents > 0 ? (completedCount / totalStudents) * 100 : 0);
 
   return (
     <div className="space-y-6">
@@ -354,6 +418,26 @@ export default function AssignmentDetailPage() {
                                 style={{ width: `${progressPercentage}%` }}
                               ></div>
                             </div>
+                            {assignment.completionStats && (
+                              <div className="grid grid-cols-2 gap-2 text-xs">
+                                <div className="flex items-center gap-1">
+                                  <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                                  <span>Completed: {assignment.completionStats.completed}</span>
+                                </div>
+                                <div className="flex items-center gap-1">
+                                  <div className="w-2 h-2 bg-yellow-500 rounded-full"></div>
+                                  <span>In Progress: {assignment.completionStats.inProgress}</span>
+                                </div>
+                                <div className="flex items-center gap-1">
+                                  <div className="w-2 h-2 bg-red-500 rounded-full"></div>
+                                  <span>Overdue: {assignment.completionStats.overdue}</span>
+                                </div>
+                                <div className="flex items-center gap-1">
+                                  <div className="w-2 h-2 bg-gray-400 rounded-full"></div>
+                                  <span>Pending: {assignment.completionStats.pending}</span>
+                                </div>
+                              </div>
+                            )}
                           </div>
                         </div>
                       </div>
@@ -380,8 +464,41 @@ export default function AssignmentDetailPage() {
 
                       <div className="space-y-2">
                         <Label className="text-sm font-medium">Assigned Students ({totalStudents})</Label>
-                        <div className="p-4 bg-muted rounded-lg max-h-60 overflow-y-auto">
-                          {assignment.students && assignment.students.length > 0 ? (
+                        <div className="p-4 bg-muted rounded-lg max-h-80 overflow-y-auto">
+                          {assignment.studentIds && assignment.studentIds.length > 0 ? (
+                            <div className="space-y-2">
+                              {assignment.studentIds.map((student) => (
+                                <div key={student._id} className="flex items-center justify-between p-3 bg-background rounded border">
+                                  <div className="flex items-center gap-3">
+                                    <Avatar className="h-8 w-8">
+                                      <AvatarFallback className="text-xs">
+                                        {student.firstName.charAt(0)}{student.lastName.charAt(0)}
+                                      </AvatarFallback>
+                                    </Avatar>
+                                    <div>
+                                      <p className="text-sm font-medium">{student.firstName} {student.lastName}</p>
+                                      <p className="text-xs text-muted-foreground">{student.email}</p>
+                                      {student.submittedAt && (
+                                        <p className="text-xs text-muted-foreground">
+                                          Submitted: {new Date(student.submittedAt).toLocaleDateString()}
+                                        </p>
+                                      )}
+                                    </div>
+                                  </div>
+                                  <div className="flex items-center gap-2">
+                                    {getStudentStatusBadge(student.completionStatus, student.score)}
+                                    <Button
+                                      variant="outline"
+                                      size="sm"
+                                      onClick={() => router.push(`/dashboard/students/${student._id}`)}
+                                    >
+                                      View Profile
+                                    </Button>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          ) : assignment.students && assignment.students.length > 0 ? (
                             <div className="space-y-2">
                               {assignment.students.map((student) => (
                                 <div key={student._id} className="flex items-center justify-between p-2 bg-background rounded border">
@@ -513,6 +630,20 @@ export default function AssignmentDetailPage() {
                   {progressPercentage.toFixed(0)}% ({completedCount}/{totalStudents})
                 </div>
               </div>
+
+              {assignment.assignedBy && (
+                <div className="space-y-2">
+                  <Label className="text-sm font-medium">Assigned By</Label>
+                  <p className="text-sm">{assignment.assignedBy.firstName} {assignment.assignedBy.lastName}</p>
+                </div>
+              )}
+
+              {assignment.testId?.totalPoints && (
+                <div className="space-y-2">
+                  <Label className="text-sm font-medium">Total Points</Label>
+                  <p className="text-sm">{assignment.testId.totalPoints} points</p>
+                </div>
+              )}
 
               <div className="space-y-2">
                 <Label className="text-sm font-medium">Created</Label>

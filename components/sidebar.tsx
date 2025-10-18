@@ -14,7 +14,7 @@ import {
   Settings,
   Users,
   ClipboardList,
-  MessageSquare,
+  CheckSquare,
   LogOut,
 } from 'lucide-react';
 import Link from 'next/link';
@@ -27,7 +27,7 @@ const navigation = [
   { name: 'Dashboard', href: '/dashboard', icon: Home },
   { name: 'Tests', href: '/dashboard/tests', icon: FileText },
   { name: 'Assignments', href: '/dashboard/assignments', icon: ClipboardList },
-  { name: 'My Tests', href: '/dashboard/submissions', icon: MessageSquare },
+  { name: 'Submissions', href: '/dashboard/submissions', icon: CheckSquare },
   { name: 'Students', href: '/dashboard/students', icon: Users },
   { name: 'Analytics', href: '/dashboard/analytics', icon: BarChart3 },
   { name: 'Settings', href: '/dashboard/settings', icon: Settings },

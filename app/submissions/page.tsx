@@ -39,6 +39,7 @@ import {
 import { authService } from '@/lib/auth';
 import { useRouter } from 'next/navigation';
 import { format } from 'date-fns';
+import Link from 'next/link';
 
 interface Assignment {
   _id: string;
@@ -60,7 +61,7 @@ interface Assignment {
   isActive: boolean;
   createdAt: string;
   updatedAt: string;
-  submissionStatus: 'not-started' | 'in-progress' | 'completed';
+  submissionStatus: 'not-started' | 'pending' | 'in-progress' | 'completed' | 'overdue';
   submissionId?: string;
   score?: number;
   submittedAt?: string;
@@ -69,13 +70,23 @@ interface Assignment {
 export default function SubmissionsPage() {
   const router = useRouter();
   const [assignments, setAssignments] = useState<Assignment[]>([]);
+  const [allAssignments, setAllAssignments] = useState<Assignment[]>([]); // To keep track of all assignments for counting
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
+  const [selectedStatus, setSelectedStatus] = useState<string>('all');
   const [user, setUser] = useState<any>(null);
 
   useEffect(() => {
     checkAuthAndFetchData();
   }, []);
+
+  // Re-fetch assignments when status filter changes
+  useEffect(() => {
+    if (user) {
+      setLoading(true);
+      fetchAssignments(selectedStatus === 'all' ? undefined : selectedStatus);
+    }
+  }, [selectedStatus]);
 
   const checkAuthAndFetchData = async () => {
     try {
@@ -88,20 +99,59 @@ export default function SubmissionsPage() {
       const userProfile = await authService.getProfile();
       setUser(userProfile);
 
-      // Fetch assignments for the student
-      await fetchAssignments();
+      // Fetch all assignments first for counting
+      await fetchAllAssignments();
+      
+      // Fetch filtered assignments for display
+      await fetchAssignments(selectedStatus === 'all' ? undefined : selectedStatus);
     } catch (error) {
       console.error('Failed to fetch data:', error);
       router.push('/login');
     }
   };
 
-  const fetchAssignments = async () => {
+  const fetchAllAssignments = async () => {
     try {
-      // Try the my-assignments endpoint first, fallback to regular assignments
+      // Fetch all assignments without status filter for counting
       let data;
       try {
         data = await authService.apiRequest('/assignments/my-assignments');
+      } catch (error) {
+        console.warn('my-assignments endpoint not available, using fallback');
+        data = await authService.apiRequest('/assignments?page=1&limit=100');
+      }
+
+      const assignments = data.assignments || [];
+      const processedAssignments = assignments.map((assignment: any) => {
+        return { ...assignment };
+      });
+
+      // Save assignmentId to localStorage for each testId
+      processedAssignments.forEach((assignment: any) => {
+        if (assignment.testId && assignment.testId._id && assignment._id) {
+          const testId = assignment.testId._id;
+          const assignmentId = assignment._id;
+          localStorage.setItem(`bhv-assignment-${testId}`, assignmentId);
+          console.log(`💾 Saved assignmentId ${assignmentId} for testId ${testId} to localStorage`);
+        }
+      });
+
+      setAllAssignments(processedAssignments);
+    } catch (error) {
+      console.error('Failed to fetch all assignments:', error);
+      setAllAssignments([]);
+    }
+  };
+
+  const fetchAssignments = async (status?: string) => {
+    try {
+      // Try the my-assignments endpoint with status parameter
+      let data;
+      try {
+        const endpoint = status && status !== 'all' 
+          ? `/assignments/my-assignments?status=${status}`
+          : '/assignments/my-assignments';
+        data = await authService.apiRequest(endpoint);
       } catch (error) {
         console.warn('my-assignments endpoint not available, using fallback');
         // Fallback to regular assignments endpoint
@@ -114,6 +164,16 @@ export default function SubmissionsPage() {
         return {
           ...assignment
         };
+      });
+
+      // Save assignmentId to localStorage for each testId
+      processedAssignments.forEach((assignment: any) => {
+        if (assignment.testId && assignment.testId._id && assignment._id) {
+          const testId = assignment.testId._id;
+          const assignmentId = assignment._id;
+          localStorage.setItem(`bhv-assignment-${testId}`, assignmentId);
+          console.log(`💾 Saved assignmentId ${assignmentId} for testId ${testId} to localStorage`);
+        }
       });
 
       setAssignments(processedAssignments);
@@ -136,7 +196,7 @@ export default function SubmissionsPage() {
         if (existingSubmissions && existingSubmissions.length > 0) {
           // Continue existing submission
           const existingSubmission = existingSubmissions[0];
-          router.push(`/submissions/take-test/${testId}?submission=${existingSubmission._id}`);
+          router.push(`/submissions/take-test/${assignmentId}?submission=${existingSubmission._id}&testId=${testId}`);
           return;
         }
       } catch (error) {
@@ -146,17 +206,17 @@ export default function SubmissionsPage() {
       // Start new test submission
       try {
         const response = await authService.startSubmission(testId, assignmentId);
-        router.push(`/submissions/take-test/${testId}?submission=${response.submissionId}`);
+        router.push(`/submissions/take-test/${assignmentId}?submission=${response.submissionId}&testId=${testId}`);
       } catch (error) {
         console.error('Failed to start submission:', error);
         // Fallback: navigate without submission ID
-        router.push(`/submissions/take-test/${testId}?assignment=${assignmentId}`);
+        router.push(`/submissions/take-test/${assignmentId}?assignment=${assignmentId}&testId=${testId}`);
       }
 
     } catch (error) {
       console.error('Failed to start test:', error);
       // Final fallback: navigate with assignment ID
-      router.push(`/submissions/take-test/${testId}?assignment=${assignmentId}`);
+      router.push(`/submissions/take-test/${assignmentId}?assignment=${assignmentId}&testId=${testId}`);
     }
   };
 
@@ -198,6 +258,7 @@ export default function SubmissionsPage() {
     }
   };
 
+  // Filter assignments by search term (status already filtered by API)
   const filteredAssignments = assignments.filter(assignment =>
     assignment.testId?.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
     assignment.testId?.description.toLowerCase().includes(searchTerm.toLowerCase())
@@ -282,7 +343,7 @@ export default function SubmissionsPage() {
           <Button 
             className="bg-[#004875] hover:bg-[#003a5c] text-white h-12 justify-start gap-3"
             onClick={() => {
-              const nextTest = assignments.find(a => a.submissionStatus === 'not-started');
+              const nextTest = allAssignments.find(a => a.submissionStatus === 'not-started' || a.submissionStatus === 'pending');
               if (nextTest) handleStartTest(nextTest._id, nextTest.testId._id);
             }}
           >
@@ -295,7 +356,7 @@ export default function SubmissionsPage() {
             onClick={() => {/* Navigate to results */}}
           >
             <FileText className="h-5 w-5" />
-            <span className="font-semibold">Review Results</span>
+            <Link href="/submissions/review-result" className="font-semibold">Review Results</Link>
           </Button>
           <Button 
             variant="outline" 
@@ -324,11 +385,11 @@ export default function SubmissionsPage() {
                 <p className="text-sm font-medium text-slate-500 mb-4 text-center">Total Assignments</p>
                 <div className="grid grid-cols-2 gap-4 mb-4">
                   <div className="text-center">
-                    <div className="text-3xl font-bold text-slate-900">{assignments.length}</div>
+                    <div className="text-3xl font-bold text-slate-900">{allAssignments.length}</div>
                     <div className="text-xs text-slate-500 mt-1">Total</div>
                   </div>
                   <div className="text-center">
-                    <div className="text-3xl font-bold text-slate-900">{assignments.filter(a => a.submissionStatus === 'completed').length}</div>
+                    <div className="text-3xl font-bold text-slate-900">{allAssignments.filter(a => a.submissionStatus === 'completed').length}</div>
                     <div className="text-xs text-slate-500 mt-1">Completed</div>
                   </div>
                 </div>
@@ -337,7 +398,7 @@ export default function SubmissionsPage() {
                     <Play className="h-4 w-4 text-[#004875]" />
                     <span className="text-sm font-medium text-slate-700">In Progress</span>
                   </div>
-                  <span className="text-lg font-bold text-slate-900">{assignments.filter(a => a.submissionStatus === 'in-progress').length}</span>
+                  <span className="text-lg font-bold text-slate-900">{allAssignments.filter(a => a.submissionStatus === 'in-progress').length}</span>
                 </div>
               </CardContent>
             </Card>
@@ -368,14 +429,14 @@ export default function SubmissionsPage() {
                         stroke="currentColor"
                         strokeWidth="8"
                         fill="none"
-                        strokeDasharray={`${(assignments.filter(a => a.submissionStatus === 'completed').length / Math.max(assignments.length, 1)) * 352} 352`}
+                        strokeDasharray={`${(allAssignments.filter(a => a.submissionStatus === 'completed').length / Math.max(allAssignments.length, 1)) * 352} 352`}
                         className="text-[#004875]"
                         strokeLinecap="round"
                       />
                     </svg>
                     <div className="absolute inset-0 flex flex-col items-center justify-center">
                       <span className="text-2xl font-bold text-slate-900">
-                        {Math.round((assignments.filter(a => a.submissionStatus === 'completed').length / Math.max(assignments.length, 1)) * 100)}%
+                        {Math.round((allAssignments.filter(a => a.submissionStatus === 'completed').length / Math.max(allAssignments.length, 1)) * 100)}%
                       </span>
                       <span className="text-xs text-slate-500">Test de done</span>
                     </div>
@@ -388,14 +449,14 @@ export default function SubmissionsPage() {
                     <div className="flex justify-between text-sm mb-2">
                       <span className="font-medium">Listening</span>
                       <span className="text-slate-600">
-                        {assignments.filter(a => a.testId?.type === 'listening' && a.submissionStatus === 'completed').length}/{assignments.filter(a => a.testId?.type === 'listening').length} tests done
+                        {allAssignments.filter(a => a.testId?.type === 'listening' && a.submissionStatus === 'completed').length}/{allAssignments.filter(a => a.testId?.type === 'listening').length} tests done
                       </span>
                     </div>
                     <div className="h-2 bg-slate-200 rounded-full overflow-hidden">
                       <div 
                         className="h-full bg-[#004875] rounded-full transition-all"
                         style={{
-                          width: `${(assignments.filter(a => a.testId?.type === 'listening' && a.submissionStatus === 'completed').length / Math.max(assignments.filter(a => a.testId?.type === 'listening').length, 1)) * 100}%`
+                          width: `${(allAssignments.filter(a => a.testId?.type === 'listening' && a.submissionStatus === 'completed').length / Math.max(allAssignments.filter(a => a.testId?.type === 'listening').length, 1)) * 100}%`
                         }}
                       />
                     </div>
@@ -404,14 +465,14 @@ export default function SubmissionsPage() {
                     <div className="flex justify-between text-sm mb-2">
                       <span className="font-medium">Reading</span>
                       <span className="text-slate-600">
-                        {assignments.filter(a => a.testId?.type === 'reading' && a.submissionStatus === 'completed').length}/{assignments.filter(a => a.testId?.type === 'reading').length} tests done
+                        {allAssignments.filter(a => a.testId?.type === 'reading' && a.submissionStatus === 'completed').length}/{allAssignments.filter(a => a.testId?.type === 'reading').length} tests done
                       </span>
                     </div>
                     <div className="h-2 bg-slate-200 rounded-full overflow-hidden">
                       <div 
                         className="h-full bg-[#004875] rounded-full transition-all"
                         style={{
-                          width: `${(assignments.filter(a => a.testId?.type === 'reading' && a.submissionStatus === 'completed').length / Math.max(assignments.filter(a => a.testId?.type === 'reading').length, 1)) * 100}%`
+                          width: `${(allAssignments.filter(a => a.testId?.type === 'reading' && a.submissionStatus === 'completed').length / Math.max(allAssignments.filter(a => a.testId?.type === 'reading').length, 1)) * 100}%`
                         }}
                       />
                     </div>
@@ -444,17 +505,59 @@ export default function SubmissionsPage() {
 
           {/* Right Content - Tests Table */}
           <div className="flex-1 min-w-0 space-y-4">
-            {/* Search */}
+            {/* Search and Filters */}
             <Card className="border-slate-200 shadow-sm">
               <CardContent className="pt-4 pb-4">
-                <div className="relative">
-                  <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
-                  <Input
-                    placeholder="Search tests..."
-                    className="pl-10 border-slate-200 focus:border-[#004875] focus:ring-[#004875]"
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                  />
+                <div className="space-y-3">
+                  <div className="relative">
+                    <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
+                    <Input
+                      placeholder="Search tests..."
+                      className="pl-10 border-slate-200 focus:border-[#004875] focus:ring-[#004875]"
+                      value={searchTerm}
+                      onChange={(e) => setSearchTerm(e.target.value)}
+                    />
+                  </div>
+                  
+                  {/* Status Filter Tabs */}
+                  <div className="flex flex-wrap gap-1">
+                    {[
+                      { key: 'all', label: 'All Tests', icon: Grid3x3, count: allAssignments.length },
+                      { key: 'pending', label: 'Not Started', icon: AlertCircle, count: allAssignments.filter(a => a.submissionStatus === 'not-started' || a.submissionStatus === 'pending').length },
+                      { key: 'in-progress', label: 'In Progress', icon: Play, count: allAssignments.filter(a => a.submissionStatus === 'in-progress').length },
+                      { key: 'completed', label: 'Completed', icon: CheckCircle, count: allAssignments.filter(a => a.submissionStatus === 'completed').length },
+                      { key: 'overdue', label: 'Overdue', icon: XCircle, count: allAssignments.filter(a => a.submissionStatus === 'overdue').length }
+                    ].map((status) => {
+                      const Icon = status.icon;
+                      const isActive = selectedStatus === status.key;
+                      return (
+                        <Button
+                          key={status.key}
+                          variant={isActive ? 'default' : 'outline'}
+                          size="sm"
+                          className={`h-8 px-3 text-xs font-medium transition-all ${
+                            isActive 
+                              ? 'bg-[#004875] hover:bg-[#003a5c] text-white border-[#004875]' 
+                              : 'border-slate-200 hover:bg-slate-50 text-slate-700'
+                          }`}
+                          onClick={() => setSelectedStatus(status.key)}
+                        >
+                          <Icon className="h-3 w-3 mr-1.5" />
+                          {status.label}
+                          <Badge 
+                            variant="secondary" 
+                            className={`ml-1.5 text-xs h-4 px-1.5 ${
+                              isActive 
+                                ? 'bg-white/20 text-white hover:bg-white/20' 
+                                : 'bg-slate-100 text-slate-600'
+                            }`}
+                          >
+                            {status.count}
+                          </Badge>
+                        </Button>
+                      );
+                    })}
+                  </div>
                 </div>
               </CardContent>
             </Card>
@@ -590,7 +693,7 @@ export default function SubmissionsPage() {
                             </TableCell>
                             <TableCell className="text-right py-3 sm:py-4">
                               <div className="flex justify-end gap-1.5 sm:gap-2">
-                                {assignment.submissionStatus === 'not-started' && !isOverdue && (
+                                {(assignment.submissionStatus === 'not-started' || assignment.submissionStatus === 'pending') && !isOverdue && (
                                   <Button
                                     size="sm"
                                     disabled={loading}

@@ -146,7 +146,7 @@ class AuthService {
     if (assignmentId) {
       body.assignmentId = assignmentId;
     }
-    return this.apiRequest(`/submissions/${testId}/start`, {
+    return this.apiRequest(`/submissions/start/${testId}`, {
       method: 'POST',
       body: JSON.stringify(body)
     });
@@ -154,7 +154,7 @@ class AuthService {
 
   // Backend API: PUT /api/submissions/:submissionId/answer
   async saveAnswer(submissionId: string, questionId: string, answer: any): Promise<any> {
-    return this.apiRequest(`/submissions/${submissionId}/answer`, {
+    return this.apiRequest(`/submissions/answer/${submissionId}`, {
       method: 'PUT',
       body: JSON.stringify({ questionId, answer })
     });
@@ -222,6 +222,32 @@ class AuthService {
   // Get detailed student statistics
   async getStudentStatistics(studentId: string): Promise<any> {
     return this.apiRequest(`/users/students/${studentId}/statistics`);
+  }
+
+  // Submissions API methods
+  async getSubmissions(params?: {
+    page?: number;
+    limit?: number;
+    status?: string;
+    type?: string;
+  }): Promise<any> {
+    const queryParams = new URLSearchParams();
+    if (params?.page) queryParams.append('page', params.page.toString());
+    if (params?.limit) queryParams.append('limit', params.limit.toString());
+    if (params?.status) queryParams.append('status', params.status);
+    if (params?.type) queryParams.append('type', params.type);
+    
+    const queryString = queryParams.toString();
+    return this.apiRequest(`/submissions${queryString ? `?${queryString}` : ''}`);
+  }
+
+  async getSubmission(submissionId: string): Promise<any> {
+    return this.apiRequest(`/submissions/${submissionId}`);
+  }
+
+  // Get detailed submission with question-by-question breakdown
+  async getSubmissionWithQuestions(submissionId: string): Promise<any> {
+    return this.apiRequest(`/submissions/${submissionId}/questions`);
   }
 }
 

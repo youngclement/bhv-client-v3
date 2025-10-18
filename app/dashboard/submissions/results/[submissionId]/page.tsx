@@ -8,6 +8,7 @@ import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import {
   ArrowLeft,
   CheckCircle,
@@ -15,15 +16,13 @@ import {
   Clock,
   Award,
   BookOpen,
-  Volume2,
-  PenTool,
+  FileText,
   Target,
   TrendingUp,
-  Home
+  User,
+  Calendar,
+  AlertCircle
 } from 'lucide-react';
-import { authService } from '@/lib/auth';
-import { format } from 'date-fns';
-import { AudioPlayer } from '@/components/ui/audio-player';
 
 interface Question {
   _id: string;

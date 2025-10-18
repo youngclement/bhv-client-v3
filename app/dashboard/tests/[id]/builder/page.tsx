@@ -175,7 +175,7 @@ export default function TestBuilderPage() {
 
   const fetchQuestions = useCallback(async (id: string) => {
     try {
-      const data = await authService.apiRequest(`/tests/${id}/questions`);
+      const data = await authService.apiRequest(`/tests/${id}/questions/all`);
       setQuestionsData(data);
       setQuestions(data.questions);
     } catch (error) {
@@ -231,7 +231,7 @@ export default function TestBuilderPage() {
     }
   };
 
-  const filteredQuestions = questions.filter(question => {
+  const filteredQuestions = (questions || []).filter(question => {
     const matchesSearch = question.question.toLowerCase().includes(searchTerm.toLowerCase()) ||
       question.tags.some(tag => tag.toLowerCase().includes(searchTerm.toLowerCase()));
     const matchesSection = selectedSection === 'all' || question.section.toString() === selectedSection;
@@ -317,7 +317,7 @@ export default function TestBuilderPage() {
           {test.status === 'draft' && (
             <Button
               onClick={handlePublishTest}
-              disabled={publishing || questions.length === 0}
+              disabled={publishing || (questions || []).length === 0}
               className="bg-green-600 hover:bg-green-700"
             >
               {publishing ? (
@@ -376,7 +376,7 @@ export default function TestBuilderPage() {
         <CardContent>
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
             <div className="text-center p-3 bg-muted/50 rounded-lg">
-              <div className="text-2xl font-bold text-primary">{questions.length}</div>
+              <div className="text-2xl font-bold text-primary">{(questions || []).length}</div>
               <div className="text-xs text-muted-foreground">Total Questions</div>
             </div>
             <div className="text-center p-3 bg-muted/50 rounded-lg">
@@ -519,7 +519,7 @@ export default function TestBuilderPage() {
                             <Button
                               variant="ghost"
                               size="sm"
-                              onClick={() => router.push(`/dashboard/tests/${testId}/question/${question._id}`)}
+                              onClick={() => router.push(`/dashboard/tests/${testId}/question/${question._id}/edit`)}
                             >
                               <Edit2 className="h-4 w-4" />
                             </Button>

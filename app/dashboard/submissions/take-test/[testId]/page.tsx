@@ -40,56 +40,78 @@ import { useToast } from '@/hooks/use-toast';
 
 interface Question {
   _id: string;
-  type: 'reading' | 'listening' | 'writing';
-  subType: string;
+  testId: string;
+  questionNumber?: number;
+  // Backend schema: reading, listening, writing, speaking, full
+  type: 'reading' | 'listening' | 'writing' | 'speaking' | 'full';
+  subType: 'multiple-choice' | 'fill-blank' | 'matching' | 'short-answer' | 'composite' | 'task1' | 'task2';
   question: string;
-  passage?: string;
-  audioUrl?: string;
+  instructionText?: string;
+  explanation?: string;
+  passage?: string; // Legacy support
+  audioUrl?: string; // Legacy support
+  // Audio file for listening questions
   audioFile?: {
     url: string;
-    publicId: string;
-    originalName: string;
-    format: string;
-    bytes: number;
+    publicId?: string;
+    originalName?: string;
+    format?: string;
+    bytes?: number;
     duration?: number;
   };
+  // Image file for diagram, chart questions
   imageFile?: {
     url: string;
-    publicId: string;
-    originalName: string;
-    format: string;
-    bytes: number;
-    width: number;
-    height: number;
+    publicId?: string;
+    originalName?: string;
+    format?: string;
+    bytes?: number;
+    width?: number;
+    height?: number;
   };
-  options?: string[];
-  correctAnswer?: string;
+  options: string[];
+  correctAnswer?: any;
   points: number;
   difficulty: 'easy' | 'medium' | 'hard';
   tags: string[];
-  instructionText?: string;
   wordLimit?: number;
   blanksCount?: number;
-  section?: number;
-  answer?: string;
-  timeSpent?: number;
+  section?: 1 | 2 | 3 | 4;
+  isComposite: boolean;
+  hasSubQuestions: boolean;
+  allowSubQuestions: boolean;
+  // Audio timestamp for sync
+  audioTimestamp?: {
+    start: number;
+    end: number;
+  };
   // Sub-questions support
-  subQuestions?: Array<{
+  subQuestions: Array<{
     _id?: string;
-    type: 'text' | 'multiple-choice' | 'true-false' | 'matching';
+    subQuestionNumber: number;
+    subQuestionType?: 'multiple-choice' | 'fill-blank' | 'true-false' | 'short-answer' | 'text' | 'matching';
     question: string;
     options?: string[];
-    correctAnswer?: string;
+    correctAnswer?: any;
+    points: number;
+    explanation?: string;
+    audioTimestamp?: {
+      start: number;
+      end: number;
+    };
+    // Student's answer (frontend only)
     answer?: string;
-    points?: number;
   }>;
+  // Student's answer tracking (frontend only)
+  answer?: string;
+  timeSpent?: number;
 }
 
 interface Test {
   _id: string;
   title: string;
   description: string;
-  type: 'reading' | 'listening' | 'writing' | 'mixed' | 'full';
+  type: 'reading' | 'listening' | 'writing' | 'speaking' | 'full';
   passages: any[];
   questions: Question[];
   duration: number;
@@ -255,7 +277,7 @@ export default function TakeTestPage() {
       setSaving(true);
       try {
         const timeSpent = Math.floor((Date.now() - questionStartTime) / 1000);
-        await authService.saveAnswer(submissionId, questionId, payloadAnswer, timeSpent);
+        await authService.saveAnswer(submissionId, questionId, payloadAnswer);
       } catch (error) {
         console.error('Failed to save answer:', error);
       } finally {
@@ -454,13 +476,13 @@ export default function TakeTestPage() {
                       <div className="border rounded-lg overflow-hidden bg-white">
                         <Image
                           src={currentQuestion.imageFile.url}
-                          alt={currentQuestion.imageFile.originalName}
-                          width={currentQuestion.imageFile.width}
-                          height={currentQuestion.imageFile.height}
+                          alt={currentQuestion.imageFile.originalName || 'Image'}
+                          width={currentQuestion.imageFile.width || 400}
+                          height={currentQuestion.imageFile.height || 300}
                           className="w-full h-auto max-h-96 object-contain"
                         />
                         <div className="p-2 text-xs text-muted-foreground bg-gray-50">
-                          {currentQuestion.imageFile.originalName} - {currentQuestion.imageFile.width}x{currentQuestion.imageFile.height} - {Math.round(currentQuestion.imageFile.bytes / 1024)} KB
+                          {currentQuestion.imageFile.originalName} - {currentQuestion.imageFile.width || 0}x{currentQuestion.imageFile.height || 0} - {Math.round((currentQuestion.imageFile.bytes || 0) / 1024)} KB
                         </div>
                       </div>
                     </div>
