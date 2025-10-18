@@ -714,9 +714,7 @@ export default function TakeTestPage() {
           assignmentId: assignmentId
         })
       });
-      
-      console.log('✅ Test submitted successfully:', response);
-      
+            
       // Clear localStorage after successful submission
       try {
         const key = getLocalStorageKey();
@@ -726,7 +724,7 @@ export default function TakeTestPage() {
         console.error('Failed to clear localStorage:', error);
       }
       
-      router.push(`/submissions/results/${submissionId}`);
+      router.push(`/submissions`);
     } catch (error) {
       console.error('Failed to submit test:', error);
       // For demo, navigate anyway - but could show error message
