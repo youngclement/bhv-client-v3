@@ -272,7 +272,7 @@ export default function TakeTestPage() {
       }
       return updated;
     });
-    
+
     if (submissionId) {
       setSaving(true);
       try {
@@ -334,10 +334,24 @@ export default function TakeTestPage() {
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
-          <p className="mt-2 text-sm text-muted-foreground">Loading test...</p>
-        </div>
+        <Card className="w-full max-w-md">
+          <CardContent className="pt-6 pb-6">
+            <div className="text-center space-y-4">
+              <div className="flex justify-center">
+                <div className="animate-spin rounded-full h-16 w-16 border-4 border-gray-200 border-t-primary"></div>
+              </div>
+              <div className="space-y-2">
+                <h3 className="text-lg font-semibold">Loading Test</h3>
+                <p className="text-sm text-muted-foreground">
+                  Please wait while we prepare your test...
+                </p>
+              </div>
+              <div className="w-full bg-gray-200 rounded-full h-2 overflow-hidden">
+                <div className="h-full bg-primary rounded-full animate-pulse" style={{ width: '60%' }}></div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
       </div>
     );
   }
@@ -453,7 +467,7 @@ export default function TakeTestPage() {
             <CardContent>
               <ScrollArea className="max-h-[70vh] pr-4">
                 <div className="space-y-6">
-                  
+
                   {/* Detailed Instructions for Writing */}
                   {currentQuestion?.instructionText && (
                     <div className="space-y-2">
@@ -533,7 +547,7 @@ export default function TakeTestPage() {
                         <Volume2 className="h-4 w-4" />
                         Listening Audio
                       </Label>
-                      <AudioPlayer 
+                      <AudioPlayer
                         src={currentQuestion.audioUrl}
                         title={`Question ${currentQuestionIndex + 1} Audio`}
                         showDownload={false}
@@ -548,11 +562,11 @@ export default function TakeTestPage() {
                   {/* Answer Section */}
                   <div className="space-y-4">
                     <Label className="text-base font-semibold">Your Answer</Label>
-                    
+
                     {/* Multiple Choice */}
                     {currentQuestion?.options && currentQuestion?.subType.includes('multiple-choice') && (
-                      <RadioGroup 
-                        value={answers[currentQuestion._id] || ''} 
+                      <RadioGroup
+                        value={answers[currentQuestion._id] || ''}
                         onValueChange={(value) => handleAnswerChange(currentQuestion._id, value)}
                       >
                         <div className="space-y-3">
@@ -571,8 +585,8 @@ export default function TakeTestPage() {
 
                     {/* True/False/Not Given */}
                     {currentQuestion?.subType.includes('true-false') && (
-                      <RadioGroup 
-                        value={answers[currentQuestion._id] || ''} 
+                      <RadioGroup
+                        value={answers[currentQuestion._id] || ''}
                         onValueChange={(value) => handleAnswerChange(currentQuestion._id, value)}
                       >
                         <div className="space-y-3">
@@ -641,11 +655,11 @@ export default function TakeTestPage() {
                       <div className="space-y-2">
                         <Textarea
                           placeholder={
-                            currentQuestion.subType === 'task1' 
+                            currentQuestion.subType === 'task1'
                               ? "Describe the chart/graph/diagram in detail. Identify key trends, comparisons, and notable features..."
                               : currentQuestion.subType === 'task2'
-                              ? "Present your argument with clear introduction, body paragraphs with examples, and conclusion..."
-                              : "Write your essay here..."
+                                ? "Present your argument with clear introduction, body paragraphs with examples, and conclusion..."
+                                : "Write your essay here..."
                           }
                           value={answers[currentQuestion._id] || ''}
                           onChange={(e) => handleAnswerChange(currentQuestion._id, e.target.value)}
@@ -675,18 +689,18 @@ export default function TakeTestPage() {
                     )}
 
                     {/* Default Text Area for other types */}
-                    {(!currentQuestion?.options && 
-                     !currentQuestion?.subType.includes('true-false') && 
-                     !currentQuestion?.subType.includes('multiple-choice') && 
-                     !['fill-blank', 'short-answer', 'essay', 'task1', 'task2', 'matching'].includes(currentQuestion?.subType || '')) && (
-                      <Textarea
-                        placeholder="Enter your answer..."
-                        value={answers[currentQuestion?._id] || ''}
-                        onChange={(e) => handleAnswerChange(currentQuestion?._id, e.target.value)}
-                        rows={4}
-                        className="w-full"
-                      />
-                    )}
+                    {(!currentQuestion?.options &&
+                      !currentQuestion?.subType.includes('true-false') &&
+                      !currentQuestion?.subType.includes('multiple-choice') &&
+                      !['fill-blank', 'short-answer', 'essay', 'task1', 'task2', 'matching'].includes(currentQuestion?.subType || '')) && (
+                        <Textarea
+                          placeholder="Enter your answer..."
+                          value={answers[currentQuestion?._id] || ''}
+                          onChange={(e) => handleAnswerChange(currentQuestion?._id, e.target.value)}
+                          rows={4}
+                          className="w-full"
+                        />
+                      )}
                   </div>
                 </div>
               </ScrollArea>

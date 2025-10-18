@@ -401,21 +401,21 @@ export default function TestsPage() {
                     </TableCell>
                     <TableCell>
                       <div className="flex items-center gap-2">
-                        <Badge 
+                        <Badge
                           variant={
-                            test.status === 'published' ? "default" : 
-                            test.status === 'draft' ? "secondary" : 
-                            "outline"
+                            test.status === 'published' ? "default" :
+                              test.status === 'draft' ? "secondary" :
+                                "outline"
                           }
                           className={
                             test.status === 'published' ? 'bg-green-100 text-green-800' :
-                            test.status === 'draft' ? 'bg-yellow-100 text-yellow-800' :
-                            'bg-gray-100 text-gray-800'
+                              test.status === 'draft' ? 'bg-yellow-100 text-yellow-800' :
+                                'bg-gray-100 text-gray-800'
                           }
                         >
-                          {test.status === 'draft' ? 'Draft' : 
-                           test.status === 'published' ? 'Published' : 
-                           test.isActive ? 'Active' : 'Inactive'}
+                          {test.status === 'draft' ? 'Draft' :
+                            test.status === 'published' ? 'Published' :
+                              test.isActive ? 'Active' : 'Inactive'}
                         </Badge>
                         {test.status === 'published' && (
                           <Switch

@@ -53,7 +53,7 @@ interface Question {
   questionNumber?: number;
   // Backend schema: reading, listening, writing, speaking, full
   type: 'reading' | 'listening' | 'writing' | 'speaking' | 'full';
-  subType: 'multiple-choice' | 'fill-blank' | 'matching' | 'short-answer' | 'composite';
+  subType: 'multiple-choice' | 'fill-blank' | 'matching' | 'short-answer' | 'composite' | 'true-false';
   question: string;
   instructionText?: string;
   explanation?: string;
@@ -186,7 +186,7 @@ export default function TakeTestPage() {
   const pendingAnswersRef = useRef<Record<string, string>>({});
   const testIdFromUrl = params.testId as string; // Lấy từ URL path: /take-test/[testId]
   const assignmentFromQuery = searchParams.get('assignment');
-  
+
   // Get assignmentId from localStorage first, then fallback to query param
   const getAssignmentId = () => {
     if (testIdFromUrl) {
@@ -196,21 +196,21 @@ export default function TakeTestPage() {
         return storedAssignmentId;
       }
     }
-    
+
     // Fallback về query param nếu localStorage không có
     if (assignmentFromQuery) {
       return assignmentFromQuery;
     }
-        return null;
+    return null;
   };
-  
+
   const assignmentId = getAssignmentId();
 
   // localStorage key for saving answers
   const getLocalStorageKey = () => `bhv-test-answers-${test?._id || 'unknown'}-${submissionId}`;
 
   // Load answers from localStorage
-  const loadAnswersFromStorage = useCallback(() => {  
+  const loadAnswersFromStorage = useCallback(() => {
     try {
       const key = getLocalStorageKey();
       const stored = localStorage.getItem(key);
@@ -243,7 +243,7 @@ export default function TakeTestPage() {
     if (saveTimeoutRef.current) {
       clearTimeout(saveTimeoutRef.current);
     }
-    
+
     // Set new timeout for 1 second (faster than server auto-save)
     saveTimeoutRef.current = setTimeout(() => {
       saveAnswersToStorage(answers);
@@ -262,33 +262,33 @@ export default function TakeTestPage() {
   const formatAnswersForSubmission = useCallback(async () => {
     const formattedAnswers: any[] = [];
     const questionMap = new Map();
-    
+
     // Group answers by main question ID
     Object.entries(answers).forEach(([key, answer]) => {
       if (key.includes('-sub-')) {
         // This is a sub-question answer
         const [mainQuestionId, subPart] = key.split('-sub-');
         const subQuestionNumber = parseInt(subPart);
-        
+
         if (!questionMap.has(mainQuestionId)) {
           questionMap.set(mainQuestionId, {
             questionId: mainQuestionId,
             subAnswers: []
           });
         }
-        
+
         // Try to find the question data from cache or current question
         let questionData = questionsCache.current.get(mainQuestionId);
         if (!questionData && currentQuestion && currentQuestion._id === mainQuestionId) {
           questionData = currentQuestion;
         }
-        
+
         if (questionData && questionData.subQuestions) {
-          const subQuestion = questionData.subQuestions.find(sq => 
-            sq.subQuestionNumber === subQuestionNumber || 
+          const subQuestion = questionData.subQuestions.find(sq =>
+            sq.subQuestionNumber === subQuestionNumber ||
             questionData.subQuestions!.indexOf(sq) === (subQuestionNumber - 1)
           );
-          
+
           if (subQuestion && subQuestion._id) {
             questionMap.get(mainQuestionId).subAnswers.push({
               subQuestionId: subQuestion._id,
@@ -309,7 +309,7 @@ export default function TakeTestPage() {
         if (key.includes(':')) {
           questionId = key.split(':')[0];
         }
-        
+
         if (!questionMap.has(questionId)) {
           questionMap.set(questionId, {
             questionId: questionId,
@@ -321,12 +321,12 @@ export default function TakeTestPage() {
         }
       }
     });
-    
+
     // Convert map to array
     questionMap.forEach((value) => {
       formattedAnswers.push(value);
     });
-    
+
     return {
       testId: test?._id || '', // Use actual testId from test object
       userId: user?._id || user?.id,
@@ -388,7 +388,7 @@ export default function TakeTestPage() {
         console.log('Sub-questions count:', currentQuestion.subQuestions.length);
         console.log('Sub-questions:', currentQuestion.subQuestions);
       }
-      }
+    }
   }, [currentQuestion]);
 
   const initializeTest = async () => {
@@ -396,7 +396,7 @@ export default function TakeTestPage() {
       console.log('🚀 Initializing test...');
       console.log('assignmentId:', assignmentId);
       console.log('testIdFromUrl:', testIdFromUrl);
-      
+
       if (!authService.isAuthenticated()) {
         router.push('/login');
         return;
@@ -404,7 +404,7 @@ export default function TakeTestPage() {
 
       // Sử dụng testId từ URL path
       let actualTestId = testIdFromUrl;
-      
+
       if (!actualTestId) {
         setError('Test ID not found in URL');
         setLoading(false);
@@ -455,16 +455,16 @@ export default function TakeTestPage() {
       // Set first question
       if (firstQuestion) {
         console.log('✅ Found first question:', firstQuestion);
-        
+
         const processedFirstQuestion = {
           ...firstQuestion,
           answer: '',
           timeSpent: 0
         };
-        
+
         // Store first question data for later use in submission formatting
         storeQuestionData(processedFirstQuestion);
-        
+
         setCurrentQuestion(processedFirstQuestion);
         setCurrentQuestionIndex(1);
         setHasNext(pagination.hasNext);
@@ -479,7 +479,7 @@ export default function TakeTestPage() {
         // Continue existing submission
         console.log('Continuing existing submission:', submissionInfo.submissionId);
         setSubmissionId(submissionInfo.submissionId);
-        
+
         // Extract time remaining (handle both object and number formats)
         let remainingSeconds = testInfo.duration * 60;
         if (submissionInfo?.timeRemaining) {
@@ -489,23 +489,23 @@ export default function TakeTestPage() {
             remainingSeconds = submissionInfo.timeRemaining;
           }
         }
-        
+
         // Check if time has expired
         if (remainingSeconds === 0) {
           setError('Your test time has expired. The submission has been automatically completed.');
           setLoading(false);
           return;
         }
-        
+
         // Use remaining time from submission info
         setTimeRemaining(remainingSeconds);
-        
+
       } else {
         // Không có submission info, khởi tạo với thời gian mặc định
         console.log('No submission info, using default test duration');
         const remainingSeconds = testInfo.duration * 60;
         setTimeRemaining(remainingSeconds);
-        
+
         // Tạo submissionId giả để localStorage hoạt động
         const fakeSubmissionId = `fake-${testInfo._id}-${Date.now()}`;
         setSubmissionId(fakeSubmissionId);
@@ -535,27 +535,27 @@ export default function TakeTestPage() {
     try {
       console.log(`🔄 Loading question ${questionNumber} from API`);
       const response = await authService.apiRequest(`/tests/${test._id}/questions/${questionNumber}`);
-      
+
       const questionData = response.questions?.[0];
       const pagination = response.pagination;
-      
+
       if (questionData) {
         console.log(`✅ Loaded question ${questionNumber}:`, questionData);
-        
+
         const processedQuestion = {
           ...questionData,
           answer: '',
           timeSpent: 0
         };
-        
+
         // Store question data for later use in submission formatting
         storeQuestionData(processedQuestion);
-        
+
         setCurrentQuestion(processedQuestion);
         setCurrentQuestionIndex(questionNumber);
         setHasNext(pagination.hasNext);
         setHasPrevious(pagination.hasPrevious);
-        
+
         return processedQuestion;
       } else {
         console.error(`❌ Question ${questionNumber} not found in API response`);
@@ -576,10 +576,10 @@ export default function TakeTestPage() {
     if (!isAutoSave) {
       setSaving(true);
     }
-    
+
     try {
       await authService.saveAnswer(submissionId, questionId, answer);
-      
+
       if (!isAutoSave) {
         console.log('✅ Answer saved to server successfully');
       }
@@ -603,12 +603,12 @@ export default function TakeTestPage() {
   const saveAllAnswersToServer = useCallback(async () => {
     const answersToSave = { ...answers };
     const answerCount = Object.keys(answersToSave).length;
-    
+
     if (answerCount === 0) return;
-    
+
     console.log(`🔄 Saving ${answerCount} answers to server...`);
     setSaving(true);
-    
+
     try {
       for (const [key, answer] of Object.entries(answersToSave)) {
         // Extract the real questionId from the UI key format
@@ -616,7 +616,7 @@ export default function TakeTestPage() {
         if (key.includes(':')) {
           questionId = key.split(':')[0];
         }
-        
+
         await saveAnswer(questionId, answer, true);
       }
       console.log('✅ All answers saved to server successfully');
@@ -638,7 +638,7 @@ export default function TakeTestPage() {
   useEffect(() => {
     if (submissionId) {
       console.log('🔄 Setting up periodic backup to server every 30 seconds');
-      
+
       autoSaveIntervalRef.current = setInterval(() => {
         const answerCount = Object.keys(answers).length;
         if (answerCount > 0) {
@@ -701,11 +701,11 @@ export default function TakeTestPage() {
 
     try {
       console.log('📤 Submitting test - formatting answers from localStorage...');
-      
+
       // Format answers from localStorage according to new structure
       const formattedSubmission = await formatAnswersForSubmission();
       console.log('📋 Formatted submission data:', formattedSubmission);
-      
+
       // Submit with formatted data using new endpoint
       const response = await authService.apiRequest(`/submissions/submit-with-answers`, {
         method: 'POST',
@@ -714,7 +714,7 @@ export default function TakeTestPage() {
           assignmentId: assignmentId
         })
       });
-            
+
       // Clear localStorage after successful submission
       try {
         const key = getLocalStorageKey();
@@ -723,7 +723,7 @@ export default function TakeTestPage() {
       } catch (error) {
         console.error('Failed to clear localStorage:', error);
       }
-      
+
       router.push(`/submissions`);
     } catch (error) {
       console.error('Failed to submit test:', error);
@@ -756,11 +756,25 @@ export default function TakeTestPage() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
-          <p className="mt-2 text-sm text-muted-foreground">Loading test...</p>
-        </div>
+      <div className="flex items-center justify-center min-h-screen bg-gray-50">
+        <Card className="w-full max-w-md mx-4">
+          <CardContent className="pt-6 pb-6">
+            <div className="text-center space-y-4">
+              <div className="flex justify-center">
+                <div className="animate-spin rounded-full h-16 w-16 border-4 border-gray-200 border-t-primary"></div>
+              </div>
+              <div className="space-y-2">
+                <h3 className="text-lg font-semibold">Loading Test</h3>
+                <p className="text-sm text-muted-foreground">
+                  Please wait while we prepare your test...
+                </p>
+              </div>
+              <div className="w-full bg-gray-200 rounded-full h-2 overflow-hidden">
+                <div className="h-full bg-primary rounded-full animate-pulse" style={{ width: '60%' }}></div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
       </div>
     );
   }
@@ -778,8 +792,8 @@ export default function TakeTestPage() {
             {error}
           </p>
           <div className="flex gap-3 justify-center">
-            <Button 
-              onClick={() => router.push('/submissions')} 
+            <Button
+              onClick={() => router.push('/submissions')}
               className="bg-red-600 hover:bg-red-700 text-white"
             >
               <ArrowLeft className="mr-2 h-4 w-4" />
@@ -887,14 +901,7 @@ export default function TakeTestPage() {
               </div>
               <div className="border-l border-slate-300 pl-3 hidden sm:block">
                 <div className="flex items-center gap-2">
-                  <div className={`flex h-6 w-6 items-center justify-center rounded-lg ${
-                      test.type === 'reading' ? 'bg-blue-100 text-blue-600' :
-                      test.type === 'listening' ? 'bg-purple-100 text-purple-600' :
-                      test.type === 'writing' ? 'bg-green-100 text-green-600' :
-                      test.type === 'speaking' ? 'bg-orange-100 text-orange-600' :
-                      test.type === 'full' ? 'bg-indigo-100 text-indigo-600' :
-                      'bg-slate-100 text-slate-600'
-                    }`}>
+                  <div className="flex h-6 w-6 items-center justify-center rounded-lg bg-gray-100 text-gray-700">
                     {getTypeIcon(test.type)}
                   </div>
                   <div>
@@ -916,8 +923,8 @@ export default function TakeTestPage() {
                 <span className="hidden sm:inline">Back</span>
               </Button>
               <div className={`flex items-center gap-2 px-3 py-2 rounded-lg transition-colors ${timeRemaining < 300
-                  ? 'border-2 border-red-300'
-                  : ''
+                ? 'border-2 border-red-300'
+                : ''
                 }`}>
                 <Clock className={`h-4 w-4 sm:h-5 sm:w-5 ${timeRemaining < 300 ? 'text-red-600 animate-pulse' : 'text-[#004875]'
                   }`} />
@@ -975,7 +982,7 @@ export default function TakeTestPage() {
                 <CardHeader className="border-b border-slate-100 bg-slate-50/50">
                   <CardTitle className="flex items-center gap-3">
                     <div className={`h-8 w-8 rounded-lg flex items-center justify-center ${currentPassage.type === 'reading' ? 'bg-blue-100' :
-                        currentPassage.type === 'listening' ? 'bg-purple-100' : 'bg-slate-100'
+                      currentPassage.type === 'listening' ? 'bg-purple-100' : 'bg-slate-100'
                       }`}>
                       {getTypeIcon(currentPassage.type)}
                     </div>
@@ -995,7 +1002,7 @@ export default function TakeTestPage() {
                             <Volume2 className="h-4 w-4" />
                             Passage Audio
                           </Label>
-                          <AudioPlayer 
+                          <AudioPlayer
                             src={currentPassage.audioUrl}
                             title={currentPassage.title || 'Passage Audio'}
                             showDownload={false}
@@ -1078,283 +1085,280 @@ export default function TakeTestPage() {
                     </div>
                   </div>
                 ) : (
-                <ScrollArea className="pr-4">
-                  <div className="space-y-6">
+                  <ScrollArea className="pr-4">
+                    <div className="space-y-6">
 
-                    {/* Question */}
-                    <div className="space-y-4">
-                      {/* Audio Player for Listening Questions */}
-                      {currentQuestion?.type === 'listening' && currentQuestion?.audioFile?.url && (
-                        <div className="mb-6">
-                          <div className="flex items-center gap-2 mb-3">
-                            <Volume2 className="h-5 w-5 text-purple-600" />
-                            <Label className="text-sm font-semibold text-slate-700">
-                              Listen to the audio
-                            </Label>
-                            {currentQuestion?.section && (
-                              <Badge variant="outline" className="ml-2 border-purple-300 text-purple-700">
-                                Section {currentQuestion.section}
-                              </Badge>
-                            )}
-                          </div>
-                          <AudioPlayer
-                            src={currentQuestion.audioFile.url}
-                            title={currentQuestion.audioFile.originalName || `Question ${currentQuestionIndex + 1} Audio`}
-                            showDownload={false}
-                            className="w-full"
-                          />
-                        </div>
-                      )}
-
-                      {/* Image for Questions with imageFile */}
-                      {currentQuestion?.imageFile?.url && (
-                        <div className="mb-6">
-                          <div className="flex items-center gap-2 mb-3">
-                            <Label className="text-sm font-semibold text-slate-700">
-                              Reference Image
-                            </Label>
-                          </div>
-                          <div className="rounded-lg border border-slate-200 overflow-hidden bg-slate-50">
-                            <img
-                              src={currentQuestion.imageFile.url}
-                              alt={currentQuestion.imageFile.originalName || 'Question image'}
-                              className="w-full h-auto max-h-96 object-contain"
-                            />
-                          </div>
-                        </div>
-                      )}
-
-                      {/* Reading Passage */}
-                      {currentQuestion?.passage && (
-                        <div className="mb-6 p-5 bg-amber-50 border-l-4 border-amber-400 rounded-r-lg">
-                          <div className="flex items-center gap-2 mb-3">
-                            <BookOpen className="h-5 w-5 text-amber-700" />
-                            <Label className="text-sm font-bold text-amber-900">
-                              Reading Passage
-                            </Label>
-                          </div>
-                          <div className="prose prose-sm max-w-none">
-                            <p className="text-slate-800 leading-relaxed whitespace-pre-wrap">
-                              {currentQuestion.passage}
-                            </p>
-                          </div>
-                        </div>
-                      )}
-
-                      <div className="pb-2 border-b border-slate-200">
-                        <Label className="text-base font-semibold text-slate-900 leading-relaxed">
-                          {currentQuestion?.question}
-                        </Label>
-                        {currentQuestion?.instructionText && (
-                          <p className="text-sm text-slate-600 mt-2 italic">
-                            {currentQuestion.instructionText}
-                          </p>
-                        )}
-                        {currentQuestion?.wordLimit && (
-                          <Badge variant="outline" className="mt-2 border-blue-300 text-blue-700">
-                            Word limit: {currentQuestion.wordLimit} words
-                          </Badge>
-                        )}
-                      </div>
-
-                      {/* Answer Input - Handle both composite and regular questions */}
-
-                      {/* Composite Questions with Sub-questions */}
-                      {currentQuestion?.subType === 'composite' && currentQuestion?.subQuestions && currentQuestion.subQuestions.length > 0 && (
-                        <div className="space-y-4">
-                          <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
-                            <div className="flex items-center gap-2 mb-2">
-                              <Badge variant="secondary" className="bg-blue-100 text-blue-700">
-                                Composite Question
-                              </Badge>
-                              <span className="text-sm text-blue-700">
-                                {currentQuestion.subQuestions.length} sub-questions
-                              </span>
-                            </div>
-                            <p className="text-sm text-blue-600">
-                              This question contains multiple sub-questions. Answer each one below.
-                            </p>
-                          </div>
-
-                          {currentQuestion.subQuestions.map((subQ, subIndex) => (
-                            <div key={subQ._id || `sub-${subIndex}-${subQ.subQuestionNumber || subIndex}`} className="p-4 border border-slate-200 rounded-lg bg-slate-50 mb-4">
-                              <div className="flex items-center gap-2 mb-3">
-                                <Badge variant="outline" className="border-slate-400 text-slate-700">
-                                  Sub-question {subQ.subQuestionNumber || (subIndex + 1)}
+                      {/* Question */}
+                      <div className="space-y-4">
+                        {/* Audio Player - Show for any question with audio */}
+                        {currentQuestion?.audioFile?.url && (
+                          <div className="mb-6">
+                            <div className="flex items-center gap-2 mb-3">
+                              <Volume2 className="h-5 w-5 text-gray-700" />
+                              <Label className="text-sm font-semibold text-slate-700">
+                                Audio
+                              </Label>
+                              {currentQuestion?.section && (
+                                <Badge variant="outline" className="ml-2">
+                                  Section {currentQuestion.section}
                                 </Badge>
-                                <Badge variant="secondary" className="bg-slate-200 text-slate-600">
-                                  {subQ.points || 1} point{(subQ.points || 1) > 1 ? 's' : ''}
-                                </Badge>
-                                <Badge variant="outline" className="border-green-400 text-green-700">
-                                  {subQ.subQuestionType ? subQ.subQuestionType.replace('-', ' ') : 'text'}
-                                </Badge>
-                              </div>
-                              
-                              <div className="mb-4">
-                                <Label className="text-sm font-medium text-slate-700">
-                                  {subQ.question}
-                                </Label>
-                              </div>
-
-                              {/* Sub-question answer input based on type */}
-                              {subQ.subQuestionType === 'multiple-choice' && subQ.options && subQ.options.length > 0 ? (
-                                <div>
-                                  <p className="text-xs text-gray-500 mb-2">Select one answer:</p>
-                                  <RadioGroup
-                                    value={answers[`${currentQuestion._id}-sub-${subQ.subQuestionNumber || subIndex}`] || ''}
-                                    onValueChange={(value) => {
-                                      const key = `${currentQuestion._id}-sub-${subQ.subQuestionNumber || subIndex}`;
-                                      setAnswers(prev => ({ ...prev, [key]: value }));
-                                      // Auto-save to localStorage will be triggered by useEffect
-                                    }}
-                                    className="space-y-2"
-                                  >
-                                    {subQ.options.map((option, optIndex) => (
-                                      <div key={optIndex} className="flex items-center space-x-3 py-1">
-                                        <RadioGroupItem 
-                                          value={option} 
-                                          id={`sub-${subIndex}-${optIndex}`} 
-                                        />
-                                        <Label 
-                                          htmlFor={`sub-${subIndex}-${optIndex}`} 
-                                          className="cursor-pointer font-medium flex-1"
-                                        >
-                                          {option}
-                                        </Label>
-                                      </div>
-                                    ))}
-                                  </RadioGroup>
-                                </div>
-                              ) : subQ.subQuestionType === 'true-false' || (subQ.options && subQ.options.length === 2 && subQ.options.includes('True')) ? (
-                                <div>
-                                  <p className="text-xs text-gray-500 mb-2">True or False:</p>
-                                  <RadioGroup
-                                    value={answers[`${currentQuestion._id}-sub-${subQ.subQuestionNumber || subIndex}`] || ''}
-                                    onValueChange={(value) => {
-                                      const key = `${currentQuestion._id}-sub-${subQ.subQuestionNumber || subIndex}`;
-                                      setAnswers(prev => ({ ...prev, [key]: value }));
-                                      // Auto-save to localStorage will be triggered by useEffect
-                                    }}
-                                    className="space-y-2"
-                                  >
-                                    <div className="flex items-center space-x-3 py-1">
-                                      <RadioGroupItem value="True" id={`sub-${subIndex}-true`} />
-                                      <Label htmlFor={`sub-${subIndex}-true`} className="cursor-pointer font-medium">
-                                        True
-                                      </Label>
-                                    </div>
-                                    <div className="flex items-center space-x-3 py-1">
-                                      <RadioGroupItem value="False" id={`sub-${subIndex}-false`} />
-                                      <Label htmlFor={`sub-${subIndex}-false`} className="cursor-pointer font-medium">
-                                        False
-                                      </Label>
-                                    </div>
-                                  </RadioGroup>
-                                </div>
-                              ) : subQ.subQuestionType === 'fill-blank' || subQ.subQuestionType === 'short-answer' ? (
-                                <div>
-                                  <p className="text-xs text-gray-500 mb-2">Type your answer:</p>
-                                  <Input
-                                    placeholder={`Answer for sub-question ${subQ.subQuestionNumber || (subIndex + 1)}...`}
-                                    value={answers[`${currentQuestion._id}-sub-${subQ.subQuestionNumber || subIndex}`] || ''}
-                                    onChange={(e) => {
-                                      const key = `${currentQuestion._id}-sub-${subQ.subQuestionNumber || subIndex}`;
-                                      setAnswers(prev => ({ ...prev, [key]: e.target.value }));
-                                      // Auto-save to localStorage will be triggered by useEffect
-                                    }}
-                                    onBlur={() => {
-                                      const key = `${currentQuestion._id}-sub-${subQ.subQuestionNumber || subIndex}`;
-                                      const value = answers[key] || '';
-                                      // Save immediately to server on blur
-                                      console.log(`💾 Committing sub-question answer to server immediately`);
-                                      saveAnswer(subQ._id || `${currentQuestion._id}-sub-${subQ.subQuestionNumber || subIndex}`, value, false);
-                                    }}
-                                    className="border-slate-300 focus:border-[#004875] focus:ring-[#004875]"
-                                  />
-                                </div>
-                              ) : (
-                                // Default to text input if type is unclear
-                                <div>
-                                  <p className="text-xs text-gray-500 mb-2">Type your answer:</p>
-                                  <Input
-                                    placeholder={`Answer for sub-question ${subQ.subQuestionNumber || (subIndex + 1)}...`}
-                                    value={answers[`${currentQuestion._id}-sub-${subQ.subQuestionNumber || subIndex}`] || ''}
-                                    onChange={(e) => {
-                                      const key = `${currentQuestion._id}-sub-${subQ.subQuestionNumber || subIndex}`;
-                                      setAnswers(prev => ({ ...prev, [key]: e.target.value }));
-                                      // Auto-save to localStorage will be triggered by useEffect
-                                    }}
-                                    onBlur={() => {
-                                      const key = `${currentQuestion._id}-sub-${subQ.subQuestionNumber || subIndex}`;
-                                      const value = answers[key] || '';
-                                      // Save immediately to server on blur
-                                      console.log(`💾 Committing sub-question answer to server immediately`);
-                                      saveAnswer(subQ._id || `${currentQuestion._id}-sub-${subQ.subQuestionNumber || subIndex}`, value, false);
-                                    }}
-                                    className="border-slate-300 focus:border-[#004875] focus:ring-[#004875]"
-                                  />
-                                </div>
                               )}
                             </div>
-                          ))}
-                        </div>
-                      )}
+                            <AudioPlayer
+                              src={currentQuestion.audioFile.url}
+                              title={currentQuestion.audioFile.originalName || `Question ${currentQuestionIndex + 1} Audio`}
+                              showDownload={false}
+                              className="w-full"
+                            />
+                          </div>
+                        )}
 
-                      {/* Regular Multiple Choice Questions */}
-                      {currentQuestion?.subType === 'multiple-choice' && currentQuestion?.options && currentQuestion.options.length > 0 && (
-                        <RadioGroup
-                          value={answers[currentAnswerKey] || ''}
-                          onValueChange={(value) => handleSelectAnswer(currentQuestion, currentQuestionIndex, value)}
-                          className="space-y-2 pt-2"
-                        >
-                          {currentQuestion.options.map((option, index) => (
-                            <div key={index} className="flex items-center space-x-3 py-2">
-                              <RadioGroupItem value={option} id={`option-${currentQuestionIndex}-${index}`} />
-                              <Label htmlFor={`option-${currentQuestionIndex}-${index}`} className="cursor-pointer font-medium flex-1 leading-relaxed">
-                                {option}
+                        {/* Image - Show for any question with image */}
+                        {currentQuestion?.imageFile?.url && (
+                          <div className="mb-6">
+                            <div className="flex items-center gap-2 mb-3">
+                              <Label className="text-sm font-semibold text-slate-700">
+                                Image
                               </Label>
                             </div>
-                          ))}
-                        </RadioGroup>
-                      )}
-
-                      {/* True/False Questions */}
-                      {currentQuestion?.subType === 'true-false' && (
-                        <RadioGroup
-                          value={answers[currentAnswerKey] || ''}
-                          onValueChange={(value) => handleSelectAnswer(currentQuestion, currentQuestionIndex, value)}
-                          className="space-y-2 pt-2"
-                        >
-                          <div className="flex items-center space-x-3 py-2">
-                            <RadioGroupItem value="True" id={`option-${currentQuestionIndex}-true`} />
-                            <Label htmlFor={`option-${currentQuestionIndex}-true`} className="cursor-pointer font-medium flex-1 leading-relaxed">
-                              True
-                            </Label>
+                            <div className="rounded-lg border border-slate-200 overflow-hidden">
+                              <img
+                                src={currentQuestion.imageFile.url}
+                                alt={currentQuestion.imageFile.originalName || 'Question image'}
+                                className="w-full h-auto max-h-96 object-contain"
+                              />
+                            </div>
                           </div>
-                          <div className="flex items-center space-x-3 py-2">
-                            <RadioGroupItem value="False" id={`option-${currentQuestionIndex}-false`} />
-                            <Label htmlFor={`option-${currentQuestionIndex}-false`} className="cursor-pointer font-medium flex-1 leading-relaxed">
-                              False
-                            </Label>
-                          </div>
-                        </RadioGroup>
-                      )}
+                        )}
 
-                      {/* Short Answer / Fill Blank / Matching */}
-                      {(currentQuestion?.subType === 'short-answer' || 
-                        currentQuestion?.subType === 'fill-blank' || 
-                        currentQuestion?.subType === 'matching') && (
-                        <Input
-                          placeholder="Type your answer here..."
-                          value={answers[currentAnswerKey] || ''}
-                          onChange={(e) => handleLocalInputChange(currentQuestion, currentQuestionIndex, e.target.value)}
-                          onBlur={() => handleLocalInputCommit(currentQuestion, currentQuestionIndex)}
-                          className="border-slate-300 focus:border-[#004875] focus:ring-[#004875] text-base py-5"
-                        />
-                      )}
+                        {/* Reading Passage */}
+                        {currentQuestion?.passage && (
+                          <div className="mb-6 p-5 rounded-lg">
+                            <div className="flex items-center gap-2 mb-3">
+                              <BookOpen className="h-5 w-5 text-gray-700" />
+                              <Label className="text-sm font-semibold">
+                                Reading Passage
+                              </Label>
+                            </div>
+                            <div className="prose prose-sm max-w-none">
+                              <p className="text-slate-800 leading-relaxed whitespace-pre-wrap">
+                                {currentQuestion.passage}
+                              </p>
+                            </div>
+                          </div>
+                        )}
+
+                        <div className="pb-2 border-b border-slate-200">
+                          <Label className="text-base font-semibold text-slate-900 leading-relaxed">
+                            {currentQuestion?.question}
+                          </Label>
+                          {currentQuestion?.instructionText && (
+                            <p className="text-sm text-slate-600 mt-2 italic">
+                              {currentQuestion.instructionText}
+                            </p>
+                          )}
+                          {currentQuestion?.wordLimit && (
+                            <Badge variant="outline" className="mt-2">
+                              Word limit: {currentQuestion.wordLimit} words
+                            </Badge>
+                          )}
+                        </div>
+
+                        {/* Answer Input - Handle both composite and regular questions */}
+
+                        {/* Composite Questions with Sub-questions */}
+                        {currentQuestion?.subType === 'composite' && currentQuestion?.subQuestions && currentQuestion.subQuestions.length > 0 && (
+                          <div className="space-y-4">
+                            <div className="p-4 rounded-lg border border-slate-200">
+                              <div className="flex items-center gap-2 mb-2">
+                                <Badge variant="secondary">
+                                  Composite Question
+                                </Badge>
+                                <span className="text-sm text-gray-700">
+                                  {currentQuestion.subQuestions.length} sub-questions
+                                </span>
+                              </div>
+                              <p className="text-sm text-gray-600">
+                                This question contains multiple sub-questions. Answer each one below.
+                              </p>
+                            </div>
+
+                            {currentQuestion.subQuestions.map((subQ, subIndex) => (
+                              <div key={subQ._id || `sub-${subIndex}-${subQ.subQuestionNumber || subIndex}`} className="p-4 rounded-lg border border-slate-200 space-y-3">
+                                <div className="flex items-center gap-2">
+                                  <Badge variant="outline">
+                                    {subQ.subQuestionNumber || (subIndex + 1)}
+                                  </Badge>
+                                  <Label className="text-sm font-medium">
+                                    {subQ.question}
+                                  </Label>
+                                </div>
+
+                                {/* Sub-question answer input based on type */}
+                                {subQ.subQuestionType === 'multiple-choice' && subQ.options && subQ.options.length > 0 ? (
+                                  <div>
+                                    <p className="text-xs text-gray-500 mb-2">Select one answer:</p>
+                                    <RadioGroup
+                                      value={answers[`${currentQuestion._id}-sub-${subQ.subQuestionNumber || subIndex}`] || ''}
+                                      onValueChange={(value) => {
+                                        const key = `${currentQuestion._id}-sub-${subQ.subQuestionNumber || subIndex}`;
+                                        setAnswers(prev => ({ ...prev, [key]: value }));
+                                        // Auto-save to localStorage will be triggered by useEffect
+                                      }}
+                                      className="space-y-2"
+                                    >
+                                      {subQ.options.map((option, optIndex) => (
+                                        <div key={optIndex} className="flex items-center space-x-3 py-1">
+                                          <RadioGroupItem
+                                            value={option}
+                                            id={`sub-${subIndex}-${optIndex}`}
+                                          />
+                                          <Label
+                                            htmlFor={`sub-${subIndex}-${optIndex}`}
+                                            className="cursor-pointer font-medium flex-1"
+                                          >
+                                            {option}
+                                          </Label>
+                                        </div>
+                                      ))}
+                                    </RadioGroup>
+                                  </div>
+                                ) : subQ.subQuestionType === 'true-false' || (subQ.options && subQ.options.length >= 2 && subQ.options.includes('True')) ? (
+                                  <div>
+                                    <p className="text-xs text-gray-500 mb-2">True / False / Not Given:</p>
+                                    <RadioGroup
+                                      value={answers[`${currentQuestion._id}-sub-${subQ.subQuestionNumber || subIndex}`] || ''}
+                                      onValueChange={(value) => {
+                                        const key = `${currentQuestion._id}-sub-${subQ.subQuestionNumber || subIndex}`;
+                                        setAnswers(prev => ({ ...prev, [key]: value }));
+                                        // Auto-save to localStorage will be triggered by useEffect
+                                      }}
+                                      className="space-y-2"
+                                    >
+                                      <div className="flex items-center space-x-3 py-1">
+                                        <RadioGroupItem value="True" id={`sub-${subIndex}-true`} />
+                                        <Label htmlFor={`sub-${subIndex}-true`} className="cursor-pointer font-medium">
+                                          True
+                                        </Label>
+                                      </div>
+                                      <div className="flex items-center space-x-3 py-1">
+                                        <RadioGroupItem value="False" id={`sub-${subIndex}-false`} />
+                                        <Label htmlFor={`sub-${subIndex}-false`} className="cursor-pointer font-medium">
+                                          False
+                                        </Label>
+                                      </div>
+                                      <div className="flex items-center space-x-3 py-1">
+                                        <RadioGroupItem value="Not Given" id={`sub-${subIndex}-notgiven`} />
+                                        <Label htmlFor={`sub-${subIndex}-notgiven`} className="cursor-pointer font-medium">
+                                          Not Given
+                                        </Label>
+                                      </div>
+                                    </RadioGroup>
+                                  </div>
+                                ) : subQ.subQuestionType === 'fill-blank' || subQ.subQuestionType === 'short-answer' ? (
+                                  <div>
+                                    <p className="text-xs text-gray-500 mb-2">Type your answer:</p>
+                                    <Input
+                                      placeholder={`Answer for sub-question ${subQ.subQuestionNumber || (subIndex + 1)}...`}
+                                      value={answers[`${currentQuestion._id}-sub-${subQ.subQuestionNumber || subIndex}`] || ''}
+                                      onChange={(e) => {
+                                        const key = `${currentQuestion._id}-sub-${subQ.subQuestionNumber || subIndex}`;
+                                        setAnswers(prev => ({ ...prev, [key]: e.target.value }));
+                                        // Auto-save to localStorage will be triggered by useEffect
+                                      }}
+                                      onBlur={() => {
+                                        const key = `${currentQuestion._id}-sub-${subQ.subQuestionNumber || subIndex}`;
+                                        const value = answers[key] || '';
+                                        // Save immediately to server on blur
+                                        console.log(`💾 Committing sub-question answer to server immediately`);
+                                        saveAnswer(subQ._id || `${currentQuestion._id}-sub-${subQ.subQuestionNumber || subIndex}`, value, false);
+                                      }}
+                                      className="border-slate-300 focus:border-[#004875] focus:ring-[#004875]"
+                                    />
+                                  </div>
+                                ) : (
+                                  // Default to text input if type is unclear
+                                  <div>
+                                    <p className="text-xs text-gray-500 mb-2">Type your answer:</p>
+                                    <Input
+                                      placeholder={`Answer for sub-question ${subQ.subQuestionNumber || (subIndex + 1)}...`}
+                                      value={answers[`${currentQuestion._id}-sub-${subQ.subQuestionNumber || subIndex}`] || ''}
+                                      onChange={(e) => {
+                                        const key = `${currentQuestion._id}-sub-${subQ.subQuestionNumber || subIndex}`;
+                                        setAnswers(prev => ({ ...prev, [key]: e.target.value }));
+                                        // Auto-save to localStorage will be triggered by useEffect
+                                      }}
+                                      onBlur={() => {
+                                        const key = `${currentQuestion._id}-sub-${subQ.subQuestionNumber || subIndex}`;
+                                        const value = answers[key] || '';
+                                        // Save immediately to server on blur
+                                        console.log(`💾 Committing sub-question answer to server immediately`);
+                                        saveAnswer(subQ._id || `${currentQuestion._id}-sub-${subQ.subQuestionNumber || subIndex}`, value, false);
+                                      }}
+                                      className="border-slate-300 focus:border-[#004875] focus:ring-[#004875]"
+                                    />
+                                  </div>
+                                )}
+                              </div>
+                            ))}
+                          </div>
+                        )}
+
+                        {/* Regular Multiple Choice Questions */}
+                        {currentQuestion?.subType === 'multiple-choice' && currentQuestion?.options && currentQuestion.options.length > 0 && (
+                          <RadioGroup
+                            value={answers[currentAnswerKey] || ''}
+                            onValueChange={(value) => handleSelectAnswer(currentQuestion, currentQuestionIndex, value)}
+                            className="space-y-2 pt-2"
+                          >
+                            {currentQuestion.options.map((option, index) => (
+                              <div key={index} className="flex items-center space-x-3 py-2">
+                                <RadioGroupItem value={option} id={`option-${currentQuestionIndex}-${index}`} />
+                                <Label htmlFor={`option-${currentQuestionIndex}-${index}`} className="cursor-pointer font-medium flex-1 leading-relaxed">
+                                  {option}
+                                </Label>
+                              </div>
+                            ))}
+                          </RadioGroup>
+                        )}
+
+                        {/* True/False Questions */}
+                        {currentQuestion?.subType === 'true-false' && (
+                          <RadioGroup
+                            value={answers[currentAnswerKey] || ''}
+                            onValueChange={(value) => handleSelectAnswer(currentQuestion, currentQuestionIndex, value)}
+                            className="space-y-2 pt-2"
+                          >
+                            <div className="flex items-center space-x-3 py-2">
+                              <RadioGroupItem value="True" id={`option-${currentQuestionIndex}-true`} />
+                              <Label htmlFor={`option-${currentQuestionIndex}-true`} className="cursor-pointer font-medium flex-1 leading-relaxed">
+                                True
+                              </Label>
+                            </div>
+                            <div className="flex items-center space-x-3 py-2">
+                              <RadioGroupItem value="False" id={`option-${currentQuestionIndex}-false`} />
+                              <Label htmlFor={`option-${currentQuestionIndex}-false`} className="cursor-pointer font-medium flex-1 leading-relaxed">
+                                False
+                              </Label>
+                            </div>
+                          </RadioGroup>
+                        )}
+
+                        {/* Short Answer / Fill Blank / Matching */}
+                        {(currentQuestion?.subType === 'short-answer' ||
+                          currentQuestion?.subType === 'fill-blank' ||
+                          currentQuestion?.subType === 'matching') && (
+                            <Input
+                              placeholder="Type your answer here..."
+                              value={answers[currentAnswerKey] || ''}
+                              onChange={(e) => handleLocalInputChange(currentQuestion, currentQuestionIndex, e.target.value)}
+                              onBlur={() => handleLocalInputCommit(currentQuestion, currentQuestionIndex)}
+                              className="border-slate-300 focus:border-[#004875] focus:ring-[#004875] text-base py-5"
+                            />
+                          )}
+                      </div>
                     </div>
-                  </div>
-                </ScrollArea>
+                  </ScrollArea>
                 )}
               </CardContent>
 
@@ -1397,8 +1401,8 @@ export default function TakeTestPage() {
                     {Array.from({ length: totalQuestions }, (_, index) => {
                       const questionNumber = index + 1;
                       // We don't have access to individual questions anymore, so just check if answer exists
-                      const isAnswered = !!answers[`question-${questionNumber}`] || 
-                                       Object.keys(answers).some(key => key.includes(`${questionNumber}:`));
+                      const isAnswered = !!answers[`question-${questionNumber}`] ||
+                        Object.keys(answers).some(key => key.includes(`${questionNumber}:`));
                       const isCurrent = currentQuestionIndex === questionNumber;
 
                       return (
@@ -1407,10 +1411,10 @@ export default function TakeTestPage() {
                           variant={isCurrent ? "default" : "outline"}
                           size="sm"
                           className={`h-8 w-8 p-0 text-xs font-semibold transition-all ${isCurrent
-                              ? 'bg-[#004875] hover:bg-[#003a5c] text-white border-[#004875] shadow-md'
-                              : isAnswered
-                                ? 'bg-green-50 border-green-400 text-green-700 hover:bg-green-100'
-                                : 'border-slate-300 hover:bg-slate-100 hover:border-slate-400'
+                            ? 'bg-[#004875] hover:bg-[#003a5c] text-white border-[#004875] shadow-md'
+                            : isAnswered
+                              ? 'bg-green-50 border-green-400 text-green-700 hover:bg-green-100'
+                              : 'border-slate-300 hover:bg-slate-100 hover:border-slate-400'
                             }`}
                           onClick={async () => {
                             setCurrentQuestionIndex(questionNumber);

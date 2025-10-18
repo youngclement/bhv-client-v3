@@ -7,6 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+import { Progress } from '@/components/ui/progress';
 import {
   Select,
   SelectContent,
@@ -25,242 +26,285 @@ import {
 import { ScrollArea } from '@/components/ui/scroll-area';
 import {
   Search,
-  Filter,
   Eye,
   Download,
   Calendar,
   Clock,
-  User,
   BookOpen,
   CheckCircle,
   XCircle,
   AlertCircle,
   FileText,
-  Users,
   Target,
   TrendingUp,
-  Award
+  Award,
+  Users,
+  Timer,
+  BarChart3,
+  RefreshCw,
+  Filter,
+  ChevronLeft,
+  ChevronRight
 } from 'lucide-react';
+import { authService } from '@/lib/auth';
 
-interface Submission {
+interface SubmissionData {
   _id: string;
   testId: {
     _id: string;
     title: string;
     type: string;
     duration: number;
+    totalPoints: number;
   };
   userId: {
     _id: string;
     email: string;
     firstName: string;
     lastName: string;
+    role: string;
   };
-  assignmentId: string;
-  answers: Array<{
-    questionId: string;
-    subQuestionId?: string;
-    subQuestionNumber?: number;
-    answer: string;
-    score: number;
+  assignmentId: {
     _id: string;
-  }>;
+    dueDate: string;
+    isActive: boolean;
+  } | null;
+  status: 'in-progress' | 'submitted' | 'pending-grading' | 'graded' | 'timeout';
   totalScore: number;
   autoScore: number;
   manualScore: number;
-  isFullyGraded: boolean;
+  percentage: number;
+  isPassed: boolean;
+  timeTakenMinutes: number;
   startedAt: string;
-  timeRemaining: number;
-  isTimeout: boolean;
-  lastSavedAt: string;
-  status: 'in-progress' | 'submitted' | 'graded' | 'expired';
+  submittedAt: string;
   createdAt: string;
   updatedAt: string;
-  submittedAt?: string;
 }
 
 interface SubmissionsResponse {
-  submissions: Submission[];
+  message: string;
+  submissions: SubmissionData[];
   pagination: {
     current: number;
     pages: number;
     total: number;
   };
+  stats: {
+    total: number;
+    byStatus: {
+      inProgress: number;
+      submitted: number;
+      pendingGrading: number;
+      graded: number;
+      timeout: number;
+    };
+    averageScore: number;
+  };
 }
 
-export default function SubmissionsPage() {
+export default function TeacherSubmissionsPage() {
   const router = useRouter();
-  const [submissions, setSubmissions] = useState<Submission[]>([]);
+  const [data, setData] = useState<SubmissionsResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
-  const [typeFilter, setTypeFilter] = useState<string>('all');
   const [currentPage, setCurrentPage] = useState(1);
-  const [pagination, setPagination] = useState({
-    current: 1,
-    pages: 1,
-    total: 0
-  });
+  const [startDate, setStartDate] = useState('');
+  const [endDate, setEndDate] = useState('');
 
   useEffect(() => {
     fetchSubmissions();
-  }, [currentPage, statusFilter, typeFilter]);
+  }, [currentPage, statusFilter, startDate, endDate]);
 
   const fetchSubmissions = async () => {
     try {
       setLoading(true);
-      let url = `http://localhost:8000/api/submissions/?page=${currentPage}&limit=10`;
-      
       const params = new URLSearchParams();
-      if (statusFilter !== 'all') params.append('status', statusFilter);
-      if (typeFilter !== 'all') params.append('type', typeFilter);
-      
-      if (params.toString()) {
-        url += `&${params.toString()}`;
+
+      params.append('page', currentPage.toString());
+      params.append('limit', '15');
+
+      if (statusFilter !== 'all') {
+        params.append('status', statusFilter);
       }
 
-      const response = await fetch(url, {
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('authToken')}`,
-          'Content-Type': 'application/json'
+      if (startDate) {
+        params.append('startDate', startDate);
+      }
+
+      if (endDate) {
+        params.append('endDate', endDate);
+      }
+
+      const token = authService.getToken();
+      const response = await fetch(
+        `${authService.getBaseUrl()}/submissions/admin/all?${params.toString()}`,
+        {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          }
         }
-      });
-      
-      if (!response.ok) throw new Error('Failed to fetch');
-      
-      const data: SubmissionsResponse = await response.json();
-      setSubmissions(data.submissions || []);
-      setPagination(data.pagination || { current: 1, pages: 1, total: 0 });
+      );
+
+      if (!response.ok) throw new Error('Failed to fetch submissions');
+
+      const responseData: SubmissionsResponse = await response.json();
+      setData(responseData);
     } catch (error) {
       console.error('Failed to fetch submissions:', error);
-      setSubmissions([]);
+      setData(null);
     } finally {
       setLoading(false);
     }
   };
 
-  // Filter submissions based on search term
-  const filteredSubmissions = submissions.filter(submission => {
+  // Client-side search filter
+  const filteredSubmissions = data?.submissions.filter(submission => {
+    if (!searchTerm) return true;
     const searchLower = searchTerm.toLowerCase();
     return (
       submission.testId.title.toLowerCase().includes(searchLower) ||
       `${submission.userId.firstName} ${submission.userId.lastName}`.toLowerCase().includes(searchLower) ||
       submission.userId.email.toLowerCase().includes(searchLower)
     );
-  });
+  }) || [];
 
-  const getStatusBadge = (status: string, isTimeout: boolean) => {
-    if (isTimeout) {
-      return (
-        <Badge variant="destructive" className="bg-orange-100 text-orange-800">
-          <Clock className="h-3 w-3 mr-1" />
-          Timeout
-        </Badge>
-      );
-    }
+  const getStatusBadge = (status: string) => {
+    const statusConfig = {
+      'submitted': {
+        variant: 'default' as const,
+        className: 'bg-green-100 text-green-800 border-green-200',
+        icon: CheckCircle,
+        label: 'Submitted'
+      },
+      'graded': {
+        variant: 'default' as const,
+        className: 'bg-blue-100 text-blue-800 border-blue-200',
+        icon: Award,
+        label: 'Graded'
+      },
+      'pending-grading': {
+        variant: 'default' as const,
+        className: 'bg-purple-100 text-purple-800 border-purple-200',
+        icon: Clock,
+        label: 'Pending Grading'
+      },
+      'in-progress': {
+        variant: 'secondary' as const,
+        className: 'bg-yellow-100 text-yellow-800 border-yellow-200',
+        icon: AlertCircle,
+        label: 'In Progress'
+      },
+      'timeout': {
+        variant: 'destructive' as const,
+        className: 'bg-red-100 text-red-800 border-red-200',
+        icon: XCircle,
+        label: 'Timeout'
+      }
+    };
 
-    switch (status) {
-      case 'submitted':
-        return (
-          <Badge variant="default" className="bg-green-100 text-green-800">
-            <CheckCircle className="h-3 w-3 mr-1" />
-            Submitted
-          </Badge>
-        );
-      case 'graded':
-        return (
-          <Badge variant="default" className="bg-blue-100 text-blue-800">
-            <Award className="h-3 w-3 mr-1" />
-            Graded
-          </Badge>
-        );
-      case 'in-progress':
-        return (
-          <Badge variant="secondary" className="bg-yellow-100 text-yellow-800">
-            <AlertCircle className="h-3 w-3 mr-1" />
-            In Progress
-          </Badge>
-        );
-      case 'expired':
-        return (
-          <Badge variant="destructive">
-            <XCircle className="h-3 w-3 mr-1" />
-            Expired
-          </Badge>
-        );
-      default:
-        return (
-          <Badge variant="outline">
-            {status}
-          </Badge>
-        );
-    }
+    const config = statusConfig[status as keyof typeof statusConfig] || {
+      variant: 'outline' as const,
+      className: '',
+      icon: FileText,
+      label: status
+    };
+
+    const Icon = config.icon;
+
+    return (
+      <Badge variant={config.variant} className={config.className}>
+        <Icon className="h-3 w-3 mr-1" />
+        {config.label}
+      </Badge>
+    );
   };
 
   const getTestTypeIcon = (type: string) => {
-    switch (type) {
-      case 'reading': return <BookOpen className="h-4 w-4" />;
-      case 'listening': return <FileText className="h-4 w-4" />;
-      case 'writing': return <FileText className="h-4 w-4" />;
-      case 'speaking': return <FileText className="h-4 w-4" />;
-      case 'full': return <Target className="h-4 w-4" />;
-      default: return <FileText className="h-4 w-4" />;
-    }
+    const icons = {
+      reading: BookOpen,
+      listening: FileText,
+      writing: FileText,
+      speaking: FileText,
+      full: Target
+    };
+    const Icon = icons[type as keyof typeof icons] || FileText;
+    return <Icon className="h-4 w-4" />;
   };
 
-  const getScoreColor = (score: number, total: number) => {
-    const percentage = total > 0 ? (score / total) * 100 : 0;
-    if (percentage >= 90) return 'text-green-600 font-semibold';
-    if (percentage >= 80) return 'text-blue-600 font-semibold';
-    if (percentage >= 70) return 'text-yellow-600 font-semibold';
-    if (percentage >= 60) return 'text-orange-600 font-semibold';
-    return 'text-red-600 font-semibold';
+  const getScoreColor = (percentage: number) => {
+    if (percentage >= 90) return 'text-green-600';
+    if (percentage >= 80) return 'text-blue-600';
+    if (percentage >= 70) return 'text-yellow-600';
+    if (percentage >= 60) return 'text-orange-600';
+    return 'text-red-600';
   };
 
-  const calculateStats = () => {
-    const total = submissions.length;
-    const submitted = submissions.filter(s => s.status === 'submitted').length;
-    const graded = submissions.filter(s => s.status === 'graded').length;
-    const inProgress = submissions.filter(s => s.status === 'in-progress').length;
-    const avgScore = submissions.length > 0 
-      ? submissions.reduce((sum, s) => sum + s.totalScore, 0) / submissions.length 
-      : 0;
-
-    return { total, submitted, graded, inProgress, avgScore };
+  const getGrade = (percentage: number) => {
+    if (percentage >= 90) return 'A';
+    if (percentage >= 80) return 'B';
+    if (percentage >= 70) return 'C';
+    if (percentage >= 60) return 'D';
+    return 'F';
   };
 
-  const stats = calculateStats();
+  const handleViewDetails = async (submissionId: string) => {
+    router.push(`/dashboard/submissions/results/${submissionId}`);
+  };
 
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
-          <p className="mt-2 text-sm text-muted-foreground">Loading submissions...</p>
+        <div className="text-center space-y-4">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto"></div>
+          <p className="text-sm text-muted-foreground">Loading submissions data...</p>
         </div>
+      </div>
+    );
+  }
+
+  if (!data) {
+    return (
+      <div className="space-y-6">
+        <Card>
+          <CardContent className="pt-6">
+            <div className="text-center text-muted-foreground">
+              Failed to load submissions. Please try again.
+            </div>
+          </CardContent>
+        </Card>
       </div>
     );
   }
 
   return (
     <div className="space-y-6">
+      {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-3xl font-bold tracking-tight">Submissions</h2>
-          <p className="text-muted-foreground">Manage and review test submissions</p>
+          <h2 className="text-3xl font-bold tracking-tight">Student Submissions</h2>
+          <p className="text-muted-foreground mt-1">
+            Monitor and review all student test submissions
+          </p>
         </div>
+        <Button onClick={fetchSubmissions} variant="outline" size="sm">
+          <RefreshCw className="h-4 w-4 mr-2" />
+          Refresh
+        </Button>
       </div>
 
-      {/* Stats Cards */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+      {/* Statistics Cards */}
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Submissions</CardTitle>
+            <CardTitle className="text-sm font-medium">Total</CardTitle>
             <FileText className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{stats.total}</div>
-            <p className="text-xs text-muted-foreground">All submissions</p>
+            <div className="text-2xl font-bold">{data.stats.total}</div>
+            <p className="text-xs text-muted-foreground mt-1">All submissions</p>
           </CardContent>
         </Card>
 
@@ -270,8 +314,10 @@ export default function SubmissionsPage() {
             <CheckCircle className="h-4 w-4 text-green-600" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-green-600">{stats.submitted}</div>
-            <p className="text-xs text-muted-foreground">Completed submissions</p>
+            <div className="text-2xl font-bold text-green-600">
+              {data.stats.byStatus.submitted}
+            </div>
+            <p className="text-xs text-muted-foreground mt-1">Completed tests</p>
           </CardContent>
         </Card>
 
@@ -281,191 +327,272 @@ export default function SubmissionsPage() {
             <Award className="h-4 w-4 text-blue-600" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-blue-600">{stats.graded}</div>
-            <p className="text-xs text-muted-foreground">Fully graded</p>
+            <div className="text-2xl font-bold text-blue-600">
+              {data.stats.byStatus.graded}
+            </div>
+            <p className="text-xs text-muted-foreground mt-1">Fully graded</p>
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Average Score</CardTitle>
+            <CardTitle className="text-sm font-medium">Pending</CardTitle>
+            <Clock className="h-4 w-4 text-purple-600" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-purple-600">
+              {data.stats.byStatus.pendingGrading}
+            </div>
+            <p className="text-xs text-muted-foreground mt-1">Needs grading</p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Avg Score</CardTitle>
             <TrendingUp className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{stats.avgScore.toFixed(1)}</div>
-            <p className="text-xs text-muted-foreground">Points average</p>
+            <div className="text-2xl font-bold">
+              {data.stats.averageScore.toFixed(1)}
+            </div>
+            <p className="text-xs text-muted-foreground mt-1">Points average</p>
           </CardContent>
         </Card>
       </div>
 
-      {/* Filters */}
+      {/* Filters Section */}
       <Card>
         <CardHeader>
-          <CardTitle>Filters</CardTitle>
+          <div className="flex items-center gap-2">
+            <Filter className="h-5 w-5" />
+            <CardTitle>Filters</CardTitle>
+          </div>
         </CardHeader>
         <CardContent>
-          <div className="flex flex-col sm:flex-row gap-4">
-            <div className="flex-1">
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Search</label>
               <div className="relative">
                 <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
                 <Input
-                  placeholder="Search by test title, student name, or email..."
+                  placeholder="Student name, test title..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                   className="pl-8"
                 />
               </div>
             </div>
-            <Select value={statusFilter} onValueChange={setStatusFilter}>
-              <SelectTrigger className="w-[180px]">
-                <SelectValue placeholder="Status" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Status</SelectItem>
-                <SelectItem value="submitted">Submitted</SelectItem>
-                <SelectItem value="graded">Graded</SelectItem>
-                <SelectItem value="in-progress">In Progress</SelectItem>
-                <SelectItem value="expired">Expired</SelectItem>
-              </SelectContent>
-            </Select>
-            <Select value={typeFilter} onValueChange={setTypeFilter}>
-              <SelectTrigger className="w-[180px]">
-                <SelectValue placeholder="Test Type" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Types</SelectItem>
-                <SelectItem value="reading">Reading</SelectItem>
-                <SelectItem value="listening">Listening</SelectItem>
-                <SelectItem value="writing">Writing</SelectItem>
-                <SelectItem value="speaking">Speaking</SelectItem>
-                <SelectItem value="full">Full Test</SelectItem>
-              </SelectContent>
-            </Select>
+
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Status</label>
+              <Select value={statusFilter} onValueChange={setStatusFilter}>
+                <SelectTrigger>
+                  <SelectValue placeholder="All Status" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Status</SelectItem>
+                  <SelectItem value="submitted">Submitted</SelectItem>
+                  <SelectItem value="graded">Graded</SelectItem>
+                  <SelectItem value="pending-grading">Pending Grading</SelectItem>
+                  <SelectItem value="in-progress">In Progress</SelectItem>
+                  <SelectItem value="timeout">Timeout</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Start Date</label>
+              <Input
+                type="date"
+                value={startDate}
+                onChange={(e) => setStartDate(e.target.value)}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-sm font-medium">End Date</label>
+              <Input
+                type="date"
+                value={endDate}
+                onChange={(e) => setEndDate(e.target.value)}
+              />
+            </div>
           </div>
+
+          {(searchTerm || statusFilter !== 'all' || startDate || endDate) && (
+            <div className="mt-4 flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  setSearchTerm('');
+                  setStatusFilter('all');
+                  setStartDate('');
+                  setEndDate('');
+                }}
+              >
+                Clear Filters
+              </Button>
+              <span className="text-sm text-muted-foreground">
+                Showing {filteredSubmissions.length} of {data.submissions.length} submissions
+              </span>
+            </div>
+          )}
         </CardContent>
       </Card>
 
       {/* Submissions Table */}
       <Card>
         <CardHeader>
-          <CardTitle>Submissions ({pagination.total})</CardTitle>
+          <CardTitle>All Submissions</CardTitle>
           <CardDescription>
-            All test submissions from students
+            {data.pagination.total} total submissions across all students and tests
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <ScrollArea className="h-[600px]">
+          <ScrollArea className="h-[600px] rounded-md border">
             <Table>
-              <TableHeader>
+              <TableHeader className="sticky top-0 bg-background">
                 <TableRow>
-                  <TableHead>Student</TableHead>
-                  <TableHead>Test</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Score</TableHead>
-                  <TableHead>Submitted</TableHead>
-                  <TableHead>Duration</TableHead>
-                  <TableHead>Actions</TableHead>
+                  <TableHead className="w-[200px]">Student</TableHead>
+                  <TableHead className="w-[250px]">Test</TableHead>
+                  <TableHead className="w-[120px]">Status</TableHead>
+                  <TableHead className="w-[120px] text-center">Score</TableHead>
+                  <TableHead className="w-[100px] text-center">Grade</TableHead>
+                  <TableHead className="w-[100px] text-center">Time</TableHead>
+                  <TableHead className="w-[150px]">Submitted</TableHead>
+                  <TableHead className="w-[120px] text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredSubmissions.map((submission) => (
-                  <TableRow key={submission._id} className="hover:bg-muted/50">
-                    <TableCell>
-                      <div className="flex items-center gap-3">
-                        <Avatar className="h-8 w-8">
-                          <AvatarFallback className="text-xs">
-                            {submission.userId.firstName.charAt(0)}{submission.userId.lastName.charAt(0)}
-                          </AvatarFallback>
-                        </Avatar>
-                        <div>
-                          <div className="font-medium">
-                            {submission.userId.firstName} {submission.userId.lastName}
-                          </div>
-                          <div className="text-sm text-muted-foreground">
-                            {submission.userId.email}
-                          </div>
-                        </div>
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex items-center gap-2">
-                        {getTestTypeIcon(submission.testId.type)}
-                        <div>
-                          <div className="font-medium">{submission.testId.title}</div>
-                          <div className="text-sm text-muted-foreground capitalize">
-                            {submission.testId.type} • {submission.testId.duration} min
-                          </div>
-                        </div>
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      {getStatusBadge(submission.status, submission.isTimeout)}
-                    </TableCell>
-                    <TableCell>
-                      <div className="text-right">
-                        <div className={`text-lg ${getScoreColor(submission.totalScore, submission.answers.length)}`}>
-                          {submission.totalScore}
-                        </div>
-                        <div className="text-sm text-muted-foreground">
-                          / {submission.answers.length} pts
-                        </div>
-                        {submission.isFullyGraded && (
-                          <div className="text-xs text-green-600">✓ Graded</div>
-                        )}
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <div className="text-sm">
-                        {submission.submittedAt ? (
-                          <>
-                            <div>{new Date(submission.submittedAt).toLocaleDateString()}</div>
-                            <div className="text-muted-foreground">
-                              {new Date(submission.submittedAt).toLocaleTimeString()}
-                            </div>
-                          </>
-                        ) : (
-                          <div className="text-muted-foreground">Not submitted</div>
-                        )}
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <div className="text-sm">
-                        {submission.submittedAt && submission.startedAt ? (
-                          <>
-                            {Math.round(
-                              (new Date(submission.submittedAt).getTime() - 
-                               new Date(submission.startedAt).getTime()) / 60000
-                            )} min
-                          </>
-                        ) : (
-                          <div className="text-muted-foreground">-</div>
-                        )}
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex items-center gap-2">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => router.push(`/dashboard/submissions/results/${submission._id}`)}
-                        >
-                          <Eye className="h-4 w-4 mr-1" />
-                          View
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => {
-                            // Export functionality
-                            window.open(`/api/submissions/${submission._id}/export`, '_blank');
-                          }}
-                        >
-                          <Download className="h-4 w-4" />
-                        </Button>
-                      </div>
+                {filteredSubmissions.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
+                      No submissions found matching your filters
                     </TableCell>
                   </TableRow>
-                ))}
+                ) : (
+                  filteredSubmissions.map((submission) => (
+                    <TableRow key={submission._id} className="hover:bg-muted/50">
+                      <TableCell>
+                        <div className="flex items-center gap-3">
+                          <Avatar className="h-9 w-9">
+                            <AvatarFallback className="text-xs bg-primary/10">
+                              {submission.userId.firstName.charAt(0)}
+                              {submission.userId.lastName.charAt(0)}
+                            </AvatarFallback>
+                          </Avatar>
+                          <div className="flex flex-col">
+                            <span className="font-medium text-sm">
+                              {submission.userId.firstName} {submission.userId.lastName}
+                            </span>
+                            <span className="text-xs text-muted-foreground">
+                              {submission.userId.email}
+                            </span>
+                          </div>
+                        </div>
+                      </TableCell>
+
+                      <TableCell>
+                        <div className="flex items-center gap-2">
+                          {getTestTypeIcon(submission.testId.type)}
+                          <div className="flex flex-col">
+                            <span className="font-medium text-sm">
+                              {submission.testId.title}
+                            </span>
+                            <span className="text-xs text-muted-foreground capitalize">
+                              {submission.testId.type} • {submission.testId.duration} min
+                            </span>
+                          </div>
+                        </div>
+                      </TableCell>
+
+                      <TableCell>
+                        {getStatusBadge(submission.status)}
+                      </TableCell>
+
+                      <TableCell>
+                        <div className="text-center">
+                          <div className={`text-lg font-bold ${getScoreColor(submission.percentage)}`}>
+                            {submission.totalScore}
+                          </div>
+                          <div className="text-xs text-muted-foreground">
+                            / {submission.testId.totalPoints}
+                          </div>
+                          <Progress
+                            value={submission.percentage}
+                            className="h-1 mt-1"
+                          />
+                        </div>
+                      </TableCell>
+
+                      <TableCell className="text-center">
+                        <Badge
+                          variant="outline"
+                          className={`font-bold ${getScoreColor(submission.percentage)}`}
+                        >
+                          {getGrade(submission.percentage)}
+                        </Badge>
+                        <div className="text-xs text-muted-foreground mt-1">
+                          {submission.percentage}%
+                        </div>
+                      </TableCell>
+
+                      <TableCell className="text-center">
+                        <div className="flex items-center justify-center gap-1">
+                          <Timer className="h-3 w-3 text-muted-foreground" />
+                          <span className="text-sm font-medium">
+                            {submission.timeTakenMinutes}m
+                          </span>
+                        </div>
+                        {submission.isPassed ? (
+                          <div className="text-xs text-green-600 mt-1">✓ Passed</div>
+                        ) : (
+                          <div className="text-xs text-red-600 mt-1">✗ Failed</div>
+                        )}
+                      </TableCell>
+
+                      <TableCell>
+                        <div className="text-sm">
+                          {submission.submittedAt ? (
+                            <>
+                              <div className="font-medium">
+                                {new Date(submission.submittedAt).toLocaleDateString('en-US', {
+                                  month: 'short',
+                                  day: 'numeric',
+                                  year: 'numeric'
+                                })}
+                              </div>
+                              <div className="text-xs text-muted-foreground">
+                                {new Date(submission.submittedAt).toLocaleTimeString('en-US', {
+                                  hour: '2-digit',
+                                  minute: '2-digit'
+                                })}
+                              </div>
+                            </>
+                          ) : (
+                            <span className="text-muted-foreground">Not submitted</span>
+                          )}
+                        </div>
+                      </TableCell>
+
+                      <TableCell className="text-right">
+                        <div className="flex items-center justify-end gap-1">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleViewDetails(submission._id)}
+                            className="h-8"
+                          >
+                            <Eye className="h-3 w-3 mr-1" />
+                            View
+                          </Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))
+                )}
               </TableBody>
             </Table>
           </ScrollArea>
@@ -473,40 +600,65 @@ export default function SubmissionsPage() {
       </Card>
 
       {/* Pagination */}
-      {pagination.pages > 1 && (
-        <div className="flex items-center justify-center space-x-2">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => setCurrentPage(currentPage - 1)}
-            disabled={currentPage <= 1}
-          >
-            Previous
-          </Button>
-          
-          <div className="flex items-center gap-1">
-            {Array.from({ length: pagination.pages }, (_, i) => i + 1).map((page) => (
-              <Button
-                key={page}
-                variant={currentPage === page ? "default" : "outline"}
-                size="sm"
-                onClick={() => setCurrentPage(page)}
-                className="w-8"
-              >
-                {page}
-              </Button>
-            ))}
-          </div>
+      {data.pagination.pages > 1 && (
+        <Card>
+          <CardContent className="pt-6">
+            <div className="flex items-center justify-between">
+              <div className="text-sm text-muted-foreground">
+                Page {data.pagination.current} of {data.pagination.pages} • Total: {data.pagination.total} submissions
+              </div>
 
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => setCurrentPage(currentPage + 1)}
-            disabled={currentPage >= pagination.pages}
-          >
-            Next
-          </Button>
-        </div>
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                  disabled={currentPage <= 1}
+                >
+                  <ChevronLeft className="h-4 w-4 mr-1" />
+                  Previous
+                </Button>
+
+                <div className="flex items-center gap-1">
+                  {Array.from({ length: Math.min(5, data.pagination.pages) }, (_, i) => {
+                    let pageNum;
+                    if (data.pagination.pages <= 5) {
+                      pageNum = i + 1;
+                    } else if (currentPage <= 3) {
+                      pageNum = i + 1;
+                    } else if (currentPage >= data.pagination.pages - 2) {
+                      pageNum = data.pagination.pages - 4 + i;
+                    } else {
+                      pageNum = currentPage - 2 + i;
+                    }
+
+                    return (
+                      <Button
+                        key={pageNum}
+                        variant={currentPage === pageNum ? "default" : "outline"}
+                        size="sm"
+                        onClick={() => setCurrentPage(pageNum)}
+                        className="w-9 h-9"
+                      >
+                        {pageNum}
+                      </Button>
+                    );
+                  })}
+                </div>
+
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setCurrentPage(prev => Math.min(data.pagination.pages, prev + 1))}
+                  disabled={currentPage >= data.pagination.pages}
+                >
+                  Next
+                  <ChevronRight className="h-4 w-4 ml-1" />
+                </Button>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
       )}
     </div>
   );

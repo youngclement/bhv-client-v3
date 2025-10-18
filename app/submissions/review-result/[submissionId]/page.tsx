@@ -141,7 +141,7 @@ export default function StudentSubmissionResultDetailPage() {
   const router = useRouter();
   const params = useParams();
   const submissionId = params.submissionId as string;
-  
+
   const [submission, setSubmission] = useState<SubmissionDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string>('');
@@ -301,7 +301,7 @@ export default function StudentSubmissionResultDetailPage() {
                 {submission.stats.overall.isPassed ? '✓ Passed' : '✗ Failed'}
               </div>
             </div>
-            
+
             <div className={`p-6 rounded-lg ${performance.bg}`}>
               <div className={`text-2xl font-bold mb-4 ${performance.color}`}>
                 {performance.level}
@@ -405,9 +405,8 @@ export default function StudentSubmissionResultDetailPage() {
           <ScrollArea className="h-[800px] pr-4">
             <div className="space-y-6">
               {submission.questions.map((question) => (
-                <div key={question._id} className={`border rounded-lg p-4 ${
-                  question.totalEarnedPoints > 0 ? 'border-green-200 bg-green-50' : 'border-red-200 bg-red-50'
-                }`}>
+                <div key={question._id} className={`border rounded-lg p-4 bg-white ${question.totalEarnedPoints > 0 ? 'border-green-300' : 'border-red-300'
+                  }`}>
                   <div className="flex items-center justify-between mb-4">
                     <h4 className="font-medium flex items-center gap-2">
                       Question {question.questionNumber}: {question.question}
@@ -472,7 +471,7 @@ export default function StudentSubmissionResultDetailPage() {
                       </p>
                     </div>
                   )}
-                  
+
                   {/* Sub-questions */}
                   {question.hasSubQuestions && question.subQuestions && (
                     <div className="space-y-3">
@@ -480,7 +479,7 @@ export default function StudentSubmissionResultDetailPage() {
                         Sub-questions ({question.subQuestionStats?.correctSubQuestions}/{question.subQuestionStats?.totalSubQuestions} correct)
                       </div>
                       {question.subQuestions.map((subQ) => (
-                        <div key={subQ._id} className="bg-white rounded-lg p-3 border ml-4">
+                        <div key={subQ._id} className="bg-white rounded-lg p-4 border">
                           <div className="flex items-center justify-between mb-2">
                             <div className="flex items-center gap-2">
                               <span className="text-sm font-medium">
@@ -499,18 +498,18 @@ export default function StudentSubmissionResultDetailPage() {
                               {subQ.userAnswer.score}/{subQ.points} pts
                             </div>
                           </div>
-                          
+
                           <div className="text-sm mb-2">
                             <strong>Question:</strong> {subQ.question}
                           </div>
-                          
+
                           {/* Show options for multiple choice */}
                           {subQ.options && subQ.options.length > 0 && (
                             <div className="text-xs text-muted-foreground mb-2">
                               <strong>Options:</strong> {subQ.options.join(', ')}
                             </div>
                           )}
-                          
+
                           <div className="grid gap-2 text-sm">
                             <div>
                               <span className="text-muted-foreground">Your Answer:</span>
@@ -598,7 +597,7 @@ export default function StudentSubmissionResultDetailPage() {
               <div className="text-sm text-muted-foreground">Total Score</div>
             </div>
           </div>
-          
+
           <div className="grid gap-4 md:grid-cols-2 mt-6">
             <div className="space-y-2">
               <div className="flex justify-between">

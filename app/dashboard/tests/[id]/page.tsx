@@ -2,21 +2,14 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { useRouter, useParams } from 'next/navigation';
-import Image from 'next/image';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
-import { Switch } from '@/components/ui/switch';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
+import { Progress } from '@/components/ui/progress';
+import { ScrollArea } from '@/components/ui/scroll-area';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -29,79 +22,124 @@ import {
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
-import { ScrollArea } from '@/components/ui/scroll-area';
-import { 
-  ArrowLeft, 
-  Edit2, 
-  Trash2, 
-  Save, 
-  X, 
-  BookOpen, 
-  Volume2, 
-  PenTool, 
+  ArrowLeft,
+  ArrowRight,
+  Edit2,
+  BookOpen,
+  Volume2,
+  PenTool,
   Play,
   Clock,
   FileText,
+  Target,
+  CheckCircle2,
+  Image as ImageIcon,
   Users,
-  Plus,
-  Eye,
-  AlertTriangle
+  Calendar
 } from 'lucide-react';
 import { authService } from '@/lib/auth';
+import { AudioPlayer } from '@/components/ui/audio-player';
 
 interface Test {
   _id: string;
   title: string;
   description: string;
-  type: 'reading' | 'listening' | 'writing' | 'mixed';
+  type: 'reading' | 'listening' | 'writing' | 'full';
   duration: number;
-  totalQuestions: number;
   totalPoints: number;
+  totalQuestionsActual: number;
+  status: 'draft' | 'active' | 'archived';
   isActive: boolean;
-  status: 'draft' | 'published' | 'archived';
-  questions: any[];
-  createdAt: string;
-  updatedAt: string;
   createdBy: {
     _id: string;
     firstName: string;
     lastName: string;
+    email: string;
   };
+  updatedBy?: {
+    _id: string;
+    firstName: string;
+    lastName: string;
+    email: string;
+  };
+  createdAt: string;
+  updatedAt: string;
 }
 
 interface Question {
   _id: string;
-  testId: string;
   questionNumber: number;
-  type: 'reading' | 'listening' | 'writing' | 'mixed';
-  subType: string;
+  type: 'reading' | 'listening' | 'writing' | 'full';
+  subType: 'multiple-choice' | 'fill-blank' | 'matching' | 'short-answer' | 'composite' | 'true-false';
   question: string;
+  instructionText?: string;
+  passage?: string;
   options?: string[];
   correctAnswer?: string;
   points: number;
   difficulty: 'easy' | 'medium' | 'hard';
-  tags: string[];
-  section: number;
-  markingType: 'auto' | 'manual';
-  isActive: boolean;
-  createdBy: {
+  section?: number;
+  hasSubQuestions: boolean;
+  audioFile?: {
+    url: string;
+    publicId?: string;
+    originalName?: string;
+    format?: string;
+    duration?: number;
+  };
+  imageFile?: {
+    url: string;
+    publicId?: string;
+    originalName?: string;
+    format?: string;
+    width?: number;
+    height?: number;
+  };
+  subQuestions?: Array<{
+    _id?: string;
+    subQuestionNumber: number;
+    subQuestionType: 'multiple-choice' | 'fill-blank' | 'true-false' | 'short-answer';
+    question: string;
+    options?: string[];
+    correctAnswer?: string;
+    points: number;
+    explanation?: string;
+  }>;
+  createdBy?: {
     _id: string;
-    email: string;
     firstName: string;
     lastName: string;
   };
-  createdAt: string;
-  updatedAt: string;
+  updatedBy?: {
+    _id: string;
+    firstName: string;
+    lastName: string;
+  };
 }
 
-interface QuestionsResponse {
+interface Assignment {
+  _id: string;
+  testId: string;
+  studentIds: Array<{
+    _id: string;
+    firstName: string;
+    lastName: string;
+    email: string;
+  }>;
+  assignedBy: {
+    _id: string;
+    firstName: string;
+    lastName: string;
+    email: string;
+  };
+  dueDate: string;
+  isActive: boolean;
+  createdAt: string;
+}
+
+interface TestDetailResponse {
+  message: string;
+  test: Test;
   questions: Question[];
   pagination: {
     page: number;
@@ -110,17 +148,18 @@ interface QuestionsResponse {
     pages: number;
     hasNext: boolean;
     hasPrev: boolean;
+    nextPage: number | null;
+    prevPage: number | null;
   };
-  testInfo: {
-    _id: string;
-    title: string;
-    type: string;
-    status: string;
-    totalQuestions: number;
-    totalPoints: number;
+  assignments: {
+    total: number;
+    active: number;
+    list: Assignment[];
   };
-  summary: {
+  statistics: {
     totalQuestions: number;
+    totalAssignments: number;
+    activeAssignments: number;
     bySection: Array<{
       _id: number;
       count: number;
@@ -149,198 +188,48 @@ const testTypes = [
 export default function TestDetailPage() {
   const router = useRouter();
   const params = useParams();
-  const [test, setTest] = useState<Test | null>(null);
+  const testId = params.id as string;
+
+  const [testData, setTestData] = useState<TestDetailResponse | null>(null);
+  const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [loading, setLoading] = useState(true);
-  const [isEditing, setIsEditing] = useState(false);
-  const [saving, setSaving] = useState(false);
-  const [editData, setEditData] = useState<Partial<Test>>({});
-  
-  // Questions state
-  const [questionsData, setQuestionsData] = useState<QuestionsResponse | null>(null);
-  const [questions, setQuestions] = useState<Question[]>([]);
+  const [error, setError] = useState('');
 
-  // Question detail dialog state
-  const [selectedQuestion, setSelectedQuestion] = useState<Question | null>(null);
-  const [isQuestionDialogOpen, setIsQuestionDialogOpen] = useState(false);
-  const [isEditingQuestion, setIsEditingQuestion] = useState(false);
-  const [questionEditData, setQuestionEditData] = useState<Partial<Question>>({});
-  const [savingQuestion, setSavingQuestion] = useState(false);
+  const fetchTestDetail = useCallback(async () => {
+    if (!testId) return;
 
-  const fetchTest = useCallback(async (id: string) => {
     try {
-      console.log('Fetching test with id:', id);
-      const data = await authService.apiRequest(`/tests/${id}`);
-      console.log('Test data received:', data);
-      setTest(data);
-      setEditData(data);
-    } catch (error) {
-      console.error('Failed to fetch test:', error);
+      setLoading(true);
+      setError('');
+      const data = await authService.apiRequest(`/tests/${testId}/full-detail`);
+      console.log('Test detail received:', data);
+      setTestData(data);
+    } catch (err: any) {
+      console.error('Failed to fetch test detail:', err);
+      setError(err.message || 'Failed to load test');
     } finally {
       setLoading(false);
     }
-  }, []);
-
-  const fetchQuestions = useCallback(async (id: string) => {
-    try {
-      console.log('Fetching questions for test id:', id);
-      const data = await authService.apiRequest(`/tests/${id}/questions/all`);
-      console.log('Questions data received:', data);
-      setQuestionsData(data);
-      setQuestions(data.questions);
-      
-      // Update test with summary info
-      if (data.testInfo) {
-        setTest(prev => prev ? {
-          ...prev,
-          totalQuestions: data.testInfo.totalQuestions,
-          totalPoints: data.testInfo.totalPoints
-        } : null);
-      }
-    } catch (error) {
-      console.error('Failed to fetch questions:', error);
-    }
-  }, []);
+  }, [testId]);
 
   useEffect(() => {
-    console.log('useEffect triggered with params.id:', params.id);
-    const loadTestData = async () => {
-      if (params.id) {
-        console.log('Loading test data for:', params.id);
-        await fetchTest(params.id as string);
-        await fetchQuestions(params.id as string);
-      }
-    };
-    loadTestData();
-  }, [params.id, fetchTest, fetchQuestions]);
+    fetchTestDetail();
+  }, [fetchTestDetail]);
 
-
-  const handleSave = async () => {
-    if (!test) return;
-    
-    setSaving(true);
-    try {
-      await authService.apiRequest(`/tests/${test._id}`, {
-        method: 'PUT',
-        body: JSON.stringify(editData),
-      });
-
-      await fetchTest(test._id);
-      setIsEditing(false);
-    } catch (error) {
-      console.error('Failed to update test:', error);
-    } finally {
-      setSaving(false);
+  const handlePrevious = () => {
+    if (currentQuestionIndex > 0) {
+      setCurrentQuestionIndex(currentQuestionIndex - 1);
     }
   };
 
-
-  const handleDelete = async () => {
-    if (!test) return;
-
-    try {
-      await authService.apiRequest(`/tests/${test._id}`, {
-        method: 'DELETE',
-      });
-      router.push('/dashboard/tests');
-    } catch (error) {
-      console.error('Failed to delete test:', error);
+  const handleNext = () => {
+    if (testData && currentQuestionIndex < testData.questions.length - 1) {
+      setCurrentQuestionIndex(currentQuestionIndex + 1);
     }
   };
 
-  // Question detail handlers
-  const handleViewQuestion = (question: Question) => {
-    setSelectedQuestion(question);
-    setQuestionEditData(question);
-    setIsEditingQuestion(false);
-    setIsQuestionDialogOpen(true);
-  };
-
-  const handleEditQuestion = () => {
-    setIsEditingQuestion(true);
-  };
-
-  const handleSaveQuestion = async () => {
-    if (!selectedQuestion) return;
-
-    setSavingQuestion(true);
-    try {
-      await authService.apiRequest(`/questions/${selectedQuestion._id}`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          question: questionEditData.question,
-          points: questionEditData.points,
-          difficulty: questionEditData.difficulty,
-          options: questionEditData.options,
-          correctAnswer: questionEditData.correctAnswer,
-          tags: questionEditData.tags,
-          section: questionEditData.section,
-        }),
-      });
-
-      // Refresh questions list
-      await fetchQuestions(test?._id as string);
-      
-      // Update selected question
-      const updatedQuestion = { ...selectedQuestion, ...questionEditData };
-      setSelectedQuestion(updatedQuestion);
-      setIsEditingQuestion(false);
-    } catch (error) {
-      console.error('Failed to update question:', error);
-    } finally {
-      setSavingQuestion(false);
-    }
-  };
-
-  const handleDeleteQuestion = async () => {
-    if (!selectedQuestion) return;
-
-    try {
-      await authService.apiRequest(`/questions/${selectedQuestion._id}`, {
-        method: 'DELETE',
-      });
-
-      // Refresh questions list
-      await fetchQuestions(test?._id as string);
-      setIsQuestionDialogOpen(false);
-      setSelectedQuestion(null);
-    } catch (error) {
-      console.error('Failed to delete question:', error);
-    }
-  };
-
-  const handleCloseQuestionDialog = () => {
-    setIsQuestionDialogOpen(false);
-    setSelectedQuestion(null);
-    setIsEditingQuestion(false);
-    setQuestionEditData({});
-  };
-
-  const handleAddOption = () => {
-    const currentOptions = questionEditData.options || [];
-    setQuestionEditData({
-      ...questionEditData,
-      options: [...currentOptions, '']
-    });
-  };
-
-  const handleRemoveOption = (index: number) => {
-    const currentOptions = questionEditData.options || [];
-    setQuestionEditData({
-      ...questionEditData,
-      options: currentOptions.filter((_, i) => i !== index)
-    });
-  };
-
-  const handleOptionChange = (index: number, value: string) => {
-    const currentOptions = [...(questionEditData.options || [])];
-    currentOptions[index] = value;
-    setQuestionEditData({
-      ...questionEditData,
-      options: currentOptions
-    });
+  const handleEditQuestion = (questionId: string) => {
+    router.push(`/dashboard/tests/${testId}/question/${questionId}/edit`);
   };
 
   const getTypeIcon = (type: string) => {
@@ -348,332 +237,137 @@ export default function TestDetailPage() {
     return typeConfig ? <typeConfig.icon className="h-5 w-5" /> : null;
   };
 
-  const formatDuration = (minutes: number) => {
-    if (!minutes) return 'N/A';
-    const hours = Math.floor(minutes / 60);
-    const mins = minutes % 60;
-    if (hours > 0) {
-      return `${hours}h ${mins}m`;
+  const getDifficultyColor = (difficulty: string) => {
+    switch (difficulty) {
+      case 'easy': return 'bg-green-100 text-green-800 border-green-200';
+      case 'medium': return 'bg-yellow-100 text-yellow-800 border-yellow-200';
+      case 'hard': return 'bg-red-100 text-red-800 border-red-200';
+      default: return 'bg-gray-100 text-gray-800 border-gray-200';
     }
-    return `${mins}m`;
   };
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-[400px]">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
-          <p className="mt-2 text-sm text-muted-foreground">Loading test...</p>
-        </div>
+      <div className="flex items-center justify-center min-h-screen bg-gray-50">
+        <Card className="w-full max-w-md">
+          <CardContent className="pt-6 pb-6">
+            <div className="text-center space-y-4">
+              <div className="flex justify-center">
+                <div className="animate-spin rounded-full h-16 w-16 border-4 border-gray-200 border-t-primary"></div>
+              </div>
+              <div className="space-y-2">
+                <h3 className="text-lg font-semibold">Loading Test</h3>
+                <p className="text-sm text-muted-foreground">
+                  Please wait while we load the test details...
+                </p>
+              </div>
+              <div className="w-full bg-gray-200 rounded-full h-2 overflow-hidden">
+                <div className="h-full bg-primary rounded-full animate-pulse" style={{ width: '60%' }}></div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
       </div>
     );
   }
 
-  if (!test) {
+  if (error || !testData) {
     return (
-      <div className="text-center py-8">
-        <p className="text-muted-foreground">Test not found</p>
-        <Button onClick={() => router.push('/dashboard/tests')} className="mt-4">
-          <ArrowLeft className="mr-2 h-4 w-4" />
-          Back to Tests
-        </Button>
+      <div className="flex items-center justify-center min-h-screen bg-gray-50">
+        <Card className="w-full max-w-md">
+          <CardContent className="pt-6 pb-6">
+            <div className="text-center space-y-4">
+              <div className="flex justify-center">
+                <div className="rounded-full bg-red-100 p-3">
+                  <FileText className="h-8 w-8 text-red-600" />
+                </div>
+              </div>
+              <div className="space-y-2">
+                <h3 className="text-lg font-semibold">Failed to Load Test</h3>
+                <p className="text-sm text-muted-foreground">
+                  {error || 'Test not found'}
+                </p>
+              </div>
+              <Button onClick={() => router.push('/dashboard/tests')} className="mt-4">
+                <ArrowLeft className="mr-2 h-4 w-4" />
+                Back to Tests
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
       </div>
     );
   }
+
+  const { test, questions, statistics, assignments } = testData;
+  const currentQuestion = questions[currentQuestionIndex];
+  const progress = questions.length > 0 ? ((currentQuestionIndex + 1) / questions.length) * 100 : 0;
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-4">
-          <Button
-            variant="outline"
-            onClick={() => router.push('/dashboard/tests')}
-          >
-            <ArrowLeft className="mr-2 h-4 w-4" />
-            Back to Tests
-          </Button>
-          <div>
-            <h2 className="text-3xl font-bold tracking-tight">Test Details</h2>
-            <p className="text-muted-foreground">View and manage test information</p>
-          </div>
-        </div>
-
-        <div className="flex gap-2">
-          {isEditing ? (
-            <>
-              <Button variant="outline" onClick={() => setIsEditing(false)}>
-                <X className="mr-2 h-4 w-4" />
-                Cancel
-              </Button>
-              <Button onClick={handleSave} disabled={saving}>
-                <Save className="mr-2 h-4 w-4" />
-                {saving ? 'Saving...' : 'Save Changes'}
-              </Button>
-            </>
-          ) : (
-            <>
-              <Button 
-                variant="outline" 
-                onClick={() => router.push(`/dashboard/tests/${test._id}/builder`)}
-                className="bg-[#004875] text-white hover:bg-[#003a5c] border-[#004875]"
+    <div className="min-h-screen bg-gray-50 pb-8">
+      {/* Header */}
+      <div className="bg-white border-b  z-10">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-4">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => router.push('/dashboard/tests')}
               >
-                <Edit2 className="mr-2 h-4 w-4" />
-                Test Builder
+                <ArrowLeft className="h-4 w-4 mr-2" />
+                Back
               </Button>
-              <Button variant="outline" onClick={() => setIsEditing(true)}>
-                <Edit2 className="mr-2 h-4 w-4" />
-                Edit Test
-              </Button>
-              <AlertDialog>
-                <AlertDialogTrigger asChild>
-                  <Button variant="destructive">
-                    <Trash2 className="mr-2 h-4 w-4" />
-                    Delete
-                  </Button>
-                </AlertDialogTrigger>
-                <AlertDialogContent>
-                  <AlertDialogHeader>
-                    <AlertDialogTitle>Delete Test</AlertDialogTitle>
-                    <AlertDialogDescription>
-                      Are you sure you want to delete this test? This action cannot be undone.
-                    </AlertDialogDescription>
-                  </AlertDialogHeader>
-                  <AlertDialogFooter>
-                    <AlertDialogCancel>Cancel</AlertDialogCancel>
-                    <AlertDialogAction onClick={handleDelete}>Delete</AlertDialogAction>
-                  </AlertDialogFooter>
-                </AlertDialogContent>
-              </AlertDialog>
-            </>
-          )}
+              <div>
+                <h1 className="text-xl font-semibold">{test.title}</h1>
+                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                  {getTypeIcon(test.type)}
+                  <span className="capitalize">{test.type} Test</span>
+                  <span>•</span>
+                  <Clock className="h-3.5 w-3.5" />
+                  <span>{test.duration} minutes</span>
+                </div>
+              </div>
+            </div>
+
+            <Badge variant={test.isActive ? "default" : "secondary"} className="text-sm">
+              {test.status}
+            </Badge>
+          </div>
         </div>
       </div>
 
-      <div className="grid gap-6 lg:grid-cols-3">
-        <div className="lg:col-span-2">
-          <Card>
-            <CardHeader>
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  {getTypeIcon(test.type)}
-                  <div>
-                    <CardTitle>{test.title}</CardTitle>
-                    <CardDescription>
-                      {test.type.charAt(0).toUpperCase() + test.type.slice(1)} Test • {formatDuration(test.duration) ?? 'N/A' }
-                    </CardDescription>
-                  </div>
-                </div>
-                <Badge variant={test.isActive ? "default" : "secondary"}>
-                  {test.isActive ? "Active" : "Draft"}
-                </Badge>
-              </div>
-            </CardHeader>
-            <CardContent>
-              <ScrollArea className="max-h-[70vh] pr-4">
-                <div className="space-y-6 pr-4">
-                  {isEditing ? (
-                    <>
-                      <div className="space-y-2">
-                        <Label>Test Title</Label>
-                        <Input
-                          value={editData.title || ''}
-                          onChange={(e) => setEditData({...editData, title: e.target.value})}
-                        />
-                      </div>
-
-                      <div className="space-y-2">
-                        <Label>Description</Label>
-                        <Textarea
-                          value={editData.description || ''}
-                          onChange={(e) => setEditData({...editData, description: e.target.value})}
-                          rows={3}
-                        />
-                      </div>
-
-                      <div className="grid grid-cols-2 gap-4">
-                        <div className="space-y-2">
-                          <Label>Test Type</Label>
-                          <Select 
-                            value={editData.type} 
-                            onValueChange={(value: any) => setEditData({...editData, type: value})}
-                          >
-                            <SelectTrigger>
-                              <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {testTypes.map(type => (
-                                <SelectItem key={type.value} value={type.value}>
-                                  <div className="flex items-center gap-2">
-                                    <type.icon className="h-4 w-4" />
-                                    {type.label}
-                                  </div>
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                        </div>
-                        
-                        <div className="space-y-2">
-                          <Label>Duration (minutes)</Label>
-                          <Input
-                            type="number"
-                            min="1"
-                            value={editData.duration || 60}
-                            onChange={(e) => setEditData({...editData, duration: parseInt(e.target.value)})}
-                          />
-                        </div>
-                      </div>
-
-                      <div className="flex items-center space-x-2">
-                        <Switch
-                          checked={editData.isActive || false}
-                          onCheckedChange={(checked) => setEditData({...editData, isActive: checked})}
-                        />
-                        <Label>Active (available for assignment)</Label>
-                      </div>
-                    </>
-                  ) : (
-                    <>
-                      <div className="space-y-2">
-                        <Label className="text-sm font-medium">Description</Label>
-                        <div className="p-4 bg-muted rounded-lg">
-                          <p className="text-sm leading-relaxed">{test.description}</p>
-                        </div>
-                      </div>
-
-                      <div className="space-y-4">
-                        <div className="flex items-center justify-between">
-                          <h3 className="text-lg font-medium">Questions ({questions.length})</h3>
-                          <Button 
-                            onClick={() => router.push(`/dashboard/tests/${test._id}/builder`)} 
-                            size="sm"
-                            className="bg-[#004875] hover:bg-[#003a5c]"
-                          >
-                            <Plus className="h-4 w-4 mr-2" />
-                            Manage Questions
-                          </Button>
-                        </div>
-                        {questions && questions.length > 0 ? (
-                          <div className="space-y-3">
-                            {questions.map((question, index) => (
-                              <div key={question._id} className="p-4 border rounded-lg hover:border-primary/50 transition-colors">
-                                <div className="flex items-start justify-between gap-4">
-                                  <div className="flex-1">
-                                    <div className="flex items-center gap-2 mb-2">
-                                      <Badge variant="outline" className="text-xs">
-                                        #{question.questionNumber}
-                                      </Badge>
-                                      <Badge variant="outline" className="text-xs">
-                                        {question.type}
-                                      </Badge>
-                                      <Badge variant="secondary" className="text-xs">
-                                        {question.points} pts
-                                      </Badge>
-                                      <Badge variant="outline" className="text-xs">
-                                        Section {question.section}
-                                      </Badge>
-                                      <Badge 
-                                        variant={question.difficulty === 'hard' ? 'destructive' : question.difficulty === 'medium' ? 'default' : 'secondary'} 
-                                        className="text-xs"
-                                      >
-                                        {question.difficulty}
-                                      </Badge>
-                                    </div>
-                                    <p className="text-sm font-medium mb-1 line-clamp-2">{question.question}</p>
-                                    <p className="text-xs text-muted-foreground">
-                                      {question.subType?.replace('-', ' ')} • {question.markingType} marking
-                                    </p>
-                                    {question.tags && question.tags.length > 0 && (
-                                      <div className="flex gap-1 mt-2">
-                                        {question.tags.slice(0, 3).map((tag, tagIndex) => (
-                                          <Badge key={tagIndex} variant="outline" className="text-xs">
-                                            {tag}
-                                          </Badge>
-                                        ))}
-                                        {question.tags.length > 3 && (
-                                          <Badge variant="outline" className="text-xs">
-                                            +{question.tags.length - 3}
-                                          </Badge>
-                                        )}
-                                      </div>
-                                    )}
-                                  </div>
-                                  <div className="flex flex-col gap-2">
-                                    <Button
-                                      size="sm"
-                                      variant="outline"
-                                      onClick={() => handleViewQuestion(question)}
-                                      className="whitespace-nowrap"
-                                    >
-                                      <Eye className="h-3 w-3 mr-1" />
-                                      View Details
-                                    </Button>
-                                    <Button
-                                      size="sm"
-                                      variant="outline"
-                                      onClick={() => router.push(`/dashboard/tests/${test._id}/question/${question._id}/edit`)}
-                                      className="whitespace-nowrap"
-                                    >
-                                      <Edit2 className="h-3 w-3 mr-1" />
-                                      Edit
-                                    </Button>
-                                  </div>
-                                </div>
-                              </div>
-                            ))}
-                          </div>
-                        ) : (
-                          <div className="text-center py-8 text-muted-foreground">
-                            <div className="space-y-2">
-                              <p>No questions added to this test yet</p>
-                              <Button 
-                                onClick={() => router.push(`/dashboard/tests/${test._id}/builder`)} 
-                                size="sm"
-                                className="bg-[#004875] hover:bg-[#003a5c]"
-                              >
-                                <Plus className="h-4 w-4 mr-2" />
-                                Start Building
-                              </Button>
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    </>
-                  )}
-                </div>
-              </ScrollArea>
-            </CardContent>
-          </Card>
-        </div>
-
-        <div className="space-y-6">
-          {/* Questions Summary */}
-          {questionsData && (
+      {/* Main Content */}
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-6">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          {/* Left Sidebar - Test Info & Statistics */}
+          <div className="lg:col-span-1 space-y-6">
+            {/* Test Statistics */}
             <Card>
               <CardHeader>
-                <CardTitle>Questions Summary</CardTitle>
+                <CardTitle className="text-base">Test Statistics</CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="text-center p-3 bg-muted/50 rounded-lg">
-                    <div className="text-2xl font-bold text-primary">{questionsData.summary.totalQuestions}</div>
-                    <div className="text-xs text-muted-foreground">Total Questions</div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="text-center p-3 bg-gray-50 rounded-lg">
+                    <div className="text-2xl font-bold text-primary">{statistics.totalQuestions}</div>
+                    <div className="text-xs text-muted-foreground">Questions</div>
                   </div>
-                  <div className="text-center p-3 bg-muted/50 rounded-lg">
-                    <div className="text-2xl font-bold text-primary">{questionsData.summary.bySection.reduce((sum, item) => sum + item.totalPoints, 0)}</div>
-                    <div className="text-xs text-muted-foreground">Total Points</div>
+                  <div className="text-center p-3 bg-gray-50 rounded-lg">
+                    <div className="text-2xl font-bold text-primary">{test.totalPoints}</div>
+                    <div className="text-xs text-muted-foreground">Points</div>
                   </div>
                 </div>
 
                 {/* By Type */}
-                {questionsData.summary.byType.length > 0 && (
+                {statistics.byType.length > 0 && (
                   <div className="space-y-2">
-                    <Label className="text-sm font-medium">By Type</Label>
+                    <Label className="text-xs font-medium">By Type</Label>
                     <div className="space-y-1">
-                      {questionsData.summary.byType.map((item) => (
+                      {statistics.byType.map((item) => (
                         <div key={item._id} className="flex items-center justify-between text-sm">
-                          <span className="capitalize">{item._id.replace('-', ' ')}</span>
-                          <Badge variant="outline" className="text-xs">{item.count}</Badge>
+                          <span className="capitalize text-xs">{item._id}</span>
+                          <Badge variant="outline" className="text-xs">{item.count} ({item.totalPoints}pts)</Badge>
                         </div>
                       ))}
                     </div>
@@ -681,17 +375,14 @@ export default function TestDetailPage() {
                 )}
 
                 {/* By Difficulty */}
-                {questionsData.summary.byDifficulty.length > 0 && (
+                {statistics.byDifficulty.length > 0 && (
                   <div className="space-y-2">
-                    <Label className="text-sm font-medium">By Difficulty</Label>
+                    <Label className="text-xs font-medium">By Difficulty</Label>
                     <div className="space-y-1">
-                      {questionsData.summary.byDifficulty.map((item) => (
+                      {statistics.byDifficulty.map((item) => (
                         <div key={item._id} className="flex items-center justify-between text-sm">
-                          <span className="capitalize">{item._id}</span>
-                          <Badge 
-                            variant={item._id === 'hard' ? 'destructive' : item._id === 'medium' ? 'default' : 'secondary'} 
-                            className="text-xs"
-                          >
+                          <span className="capitalize text-xs">{item._id}</span>
+                          <Badge className={`text-xs ${getDifficultyColor(item._id)}`}>
                             {item.count}
                           </Badge>
                         </div>
@@ -701,14 +392,14 @@ export default function TestDetailPage() {
                 )}
 
                 {/* By Section */}
-                {questionsData.summary.bySection.length > 0 && (
+                {statistics.bySection.length > 0 && (
                   <div className="space-y-2">
-                    <Label className="text-sm font-medium">By Section</Label>
+                    <Label className="text-xs font-medium">By Section</Label>
                     <div className="space-y-1">
-                      {questionsData.summary.bySection.map((item) => (
+                      {statistics.bySection.map((item) => (
                         <div key={item._id} className="flex items-center justify-between text-sm">
-                          <span>Section {item._id}</span>
-                          <Badge variant="outline" className="text-xs">{item.count}</Badge>
+                          <span className="text-xs">Section {item._id}</span>
+                          <Badge variant="outline" className="text-xs">{item.count} ({item.totalPoints}pts)</Badge>
                         </div>
                       ))}
                     </div>
@@ -716,409 +407,403 @@ export default function TestDetailPage() {
                 )}
               </CardContent>
             </Card>
-          )}
 
-          <Card>
-            <CardHeader>
-              <CardTitle>Test Info</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="space-y-2">
-                <Label className="text-sm font-medium">Type</Label>
-                <div className="flex items-center gap-2">
-                  {getTypeIcon(test.type)}
-                  <span className="capitalize">{test.type}</span>
-                </div>
-              </div>
-
-              <div className="space-y-2">
-                <Label className="text-sm font-medium">Duration</Label>
-                <div className="flex items-center gap-1">
-                  <Clock className="h-4 w-4 text-muted-foreground" />
-                  <span className="text-sm">{formatDuration(test.duration)}</span>
-                </div>
-              </div>
-
-              <div className="space-y-2">
-                <Label className="text-sm font-medium">Status</Label>
-                <Badge variant={test.isActive ? "default" : "secondary"}>
-                  {test.isActive ? "Active" : "Draft"}
-                </Badge>
-              </div>
-
-              <div className="space-y-2">
-                <Label className="text-sm font-medium">Content</Label>
-                <div className="space-y-1">
-                  <div className="flex items-center gap-1 text-sm">
-                    <FileText className="h-4 w-4 text-muted-foreground" />
-                    {test.questions?.length || 0} questions
+            {/* Assignments */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base flex items-center gap-2">
+                  <Users className="h-4 w-4" />
+                  Assignments
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="text-center p-3 bg-gray-50 rounded-lg">
+                    <div className="text-xl font-bold">{assignments.total}</div>
+                    <div className="text-xs text-muted-foreground">Total</div>
                   </div>
-                  <div className="flex items-center gap-1 text-sm">
-                    <Users className="h-4 w-4 text-muted-foreground" />
-                    {test.totalPoints || 0} total points
+                  <div className="text-center p-3 bg-green-50 rounded-lg">
+                    <div className="text-xl font-bold text-green-700">{assignments.active}</div>
+                    <div className="text-xs text-muted-foreground">Active</div>
                   </div>
                 </div>
-              </div>
 
-              <div className="space-y-2">
-                <Label className="text-sm font-medium">Created By</Label>
-                <p className="text-sm">{test.createdBy?.firstName} {test.createdBy?.lastName}</p>
-              </div>
-
-              <div className="space-y-2">
-                <Label className="text-sm font-medium">Created</Label>
-                <p className="text-sm">{new Date(test.createdAt).toLocaleDateString()}</p>
-              </div>
-
-              <div className="space-y-2">
-                <Label className="text-sm font-medium">Last Updated</Label>
-                <p className="text-sm">{new Date(test.updatedAt).toLocaleDateString()}</p>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-      </div>
-
-      {/* Question Detail Dialog */}
-      <Dialog open={isQuestionDialogOpen} onOpenChange={setIsQuestionDialogOpen}>
-        <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle className="flex items-center justify-between">
-              <span>Question #{selectedQuestion?.questionNumber}</span>
-              <div className="flex gap-2">
-                {isEditingQuestion ? (
-                  <>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => {
-                        setIsEditingQuestion(false);
-                        setQuestionEditData(selectedQuestion || {});
-                      }}
-                    >
-                      <X className="h-4 w-4 mr-1" />
-                      Cancel
-                    </Button>
-                    <Button
-                      size="sm"
-                      onClick={handleSaveQuestion}
-                      disabled={savingQuestion}
-                    >
-                      <Save className="h-4 w-4 mr-1" />
-                      {savingQuestion ? 'Saving...' : 'Save Changes'}
-                    </Button>
-                  </>
-                ) : (
-                  <>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={handleEditQuestion}
-                    >
-                      <Edit2 className="h-4 w-4 mr-1" />
-                      Edit
-                    </Button>
-                    <AlertDialog>
-                      <AlertDialogTrigger asChild>
-                        <Button size="sm" variant="destructive">
-                          <Trash2 className="h-4 w-4 mr-1" />
-                          Delete
-                        </Button>
-                      </AlertDialogTrigger>
-                      <AlertDialogContent>
-                        <AlertDialogHeader>
-                          <AlertDialogTitle>Delete Question</AlertDialogTitle>
-                          <AlertDialogDescription>
-                            Are you sure you want to delete this question? This action cannot be undone.
-                          </AlertDialogDescription>
-                        </AlertDialogHeader>
-                        <AlertDialogFooter>
-                          <AlertDialogCancel>Cancel</AlertDialogCancel>
-                          <AlertDialogAction onClick={handleDeleteQuestion}>Delete</AlertDialogAction>
-                        </AlertDialogFooter>
-                      </AlertDialogContent>
-                    </AlertDialog>
-                  </>
-                )}
-              </div>
-            </DialogTitle>
-            <DialogDescription>
-              {selectedQuestion && (
-                <div className="flex gap-2 mt-2">
-                  <Badge variant="outline">{selectedQuestion.type}</Badge>
-                  <Badge variant="outline">{selectedQuestion.subType}</Badge>
-                  <Badge variant={selectedQuestion.difficulty === 'hard' ? 'destructive' : selectedQuestion.difficulty === 'medium' ? 'default' : 'secondary'}>
-                    {selectedQuestion.difficulty}
-                  </Badge>
-                  <Badge variant="secondary">{selectedQuestion.points} points</Badge>
-                  <Badge variant="outline">Section {selectedQuestion.section}</Badge>
-                </div>
-              )}
-            </DialogDescription>
-          </DialogHeader>
-
-          {selectedQuestion && (
-            <div className="space-y-4 mt-4">
-              {isEditingQuestion ? (
-                <>
-                  {/* Edit Mode */}
-                  <div className="space-y-2">
-                    <Label>Question</Label>
-                    <Textarea
-                      value={questionEditData.question || ''}
-                      onChange={(e) => setQuestionEditData({ ...questionEditData, question: e.target.value })}
-                      rows={4}
-                      className="resize-none"
-                    />
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label>Points</Label>
-                      <Input
-                        type="number"
-                        min="1"
-                        value={questionEditData.points || 1}
-                        onChange={(e) => setQuestionEditData({ ...questionEditData, points: parseInt(e.target.value) })}
-                      />
-                    </div>
-
-                    <div className="space-y-2">
-                      <Label>Difficulty</Label>
-                      <Select
-                        value={questionEditData.difficulty || 'medium'}
-                        onValueChange={(value: 'easy' | 'medium' | 'hard') => setQuestionEditData({ ...questionEditData, difficulty: value })}
-                      >
-                        <SelectTrigger>
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="easy">Easy</SelectItem>
-                          <SelectItem value="medium">Medium</SelectItem>
-                          <SelectItem value="hard">Hard</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label>Section</Label>
-                    <Select
-                      value={questionEditData.section?.toString() || '1'}
-                      onValueChange={(value) => setQuestionEditData({ ...questionEditData, section: parseInt(value) })}
-                    >
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="1">Section 1</SelectItem>
-                        <SelectItem value="2">Section 2</SelectItem>
-                        <SelectItem value="3">Section 3</SelectItem>
-                        <SelectItem value="4">Section 4</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  {/* Options editor */}
-                  {selectedQuestion.subType?.includes('multiple-choice') && (
-                    <div className="space-y-2">
-                      <Label>Options</Label>
+                {assignments.list.length > 0 && (
+                  <div className="space-y-2 pt-2">
+                    <Label className="text-xs font-medium">Recent Assignments</Label>
+                    <ScrollArea className="h-48">
                       <div className="space-y-2">
-                        {(questionEditData.options || []).map((option, index) => (
-                          <div key={index} className="flex items-center gap-2">
-                            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary text-primary-foreground text-sm font-semibold">
-                              {String.fromCharCode(65 + index)}
+                        {assignments.list.slice(0, 5).map((assignment) => (
+                          <div key={assignment._id} className="p-2 border rounded text-xs space-y-1">
+                            <div className="flex items-center justify-between">
+                              <Badge variant={assignment.isActive ? "default" : "secondary"} className="text-xs">
+                                {assignment.isActive ? "Active" : "Inactive"}
+                              </Badge>
+                              <span className="text-xs text-muted-foreground">
+                                {assignment.studentIds.length} students
+                              </span>
                             </div>
-                            <Input
-                              value={option}
-                              onChange={(e) => handleOptionChange(index, e.target.value)}
-                              className="flex-1"
-                            />
-                            {(questionEditData.options?.length || 0) > 2 && (
-                              <Button
-                                size="sm"
-                                variant="ghost"
-                                onClick={() => handleRemoveOption(index)}
-                              >
-                                <X className="h-4 w-4" />
-                              </Button>
-                            )}
+                            <div className="flex items-center gap-1 text-muted-foreground">
+                              <Calendar className="h-3 w-3" />
+                              <span>Due: {new Date(assignment.dueDate).toLocaleDateString()}</span>
+                            </div>
                           </div>
                         ))}
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={handleAddOption}
-                          className="w-full"
-                        >
-                          <Plus className="h-4 w-4 mr-2" />
-                          Add Option
-                        </Button>
                       </div>
+                    </ScrollArea>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </div>
 
-                      <div className="space-y-2 mt-4">
-                        <Label>Correct Answer</Label>
-                        <Select
-                          value={questionEditData.correctAnswer || ''}
-                          onValueChange={(value) => setQuestionEditData({ ...questionEditData, correctAnswer: value })}
-                        >
-                          <SelectTrigger>
-                            <SelectValue placeholder="Select correct answer" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {(questionEditData.options || []).map((option, index) => (
-                              <SelectItem key={index} value={option}>
-                                {String.fromCharCode(65 + index)}. {option}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
+          {/* Main Content - Question Display */}
+          <div className="lg:col-span-2">
+            {questions.length === 0 ? (
+              <Card>
+                <CardContent className="pt-12 pb-12">
+                  <div className="text-center space-y-4">
+                    <div className="flex justify-center">
+                      <div className="rounded-full bg-gray-100 p-4">
+                        <FileText className="h-8 w-8 text-gray-400" />
                       </div>
                     </div>
-                  )}
-
-                  <div className="space-y-2">
-                    <Label>Tags</Label>
-                    <div className="flex flex-wrap gap-2">
-                      {(questionEditData.tags || []).map((tag, index) => (
-                        <Badge key={index} variant="outline" className="gap-1">
-                          {tag}
-                          <button
-                            onClick={() => {
-                              const newTags = [...(questionEditData.tags || [])];
-                              newTags.splice(index, 1);
-                              setQuestionEditData({ ...questionEditData, tags: newTags });
-                            }}
-                            className="hover:text-red-600"
-                          >
-                            <X className="h-3 w-3" />
-                          </button>
-                        </Badge>
-                      ))}
+                    <div className="space-y-2">
+                      <h3 className="text-lg font-semibold">No Questions Yet</h3>
+                      <p className="text-sm text-muted-foreground">
+                        This test doesn't have any questions yet.
+                      </p>
                     </div>
                   </div>
-                </>
-              ) : (
-                <>
-                  {/* View Mode */}
-                  <div className="space-y-4">
+                </CardContent>
+              </Card>
+            ) : (
+              <div className="space-y-4">
+                {/* Progress Bar */}
+                <Card>
+                  <CardContent className="pt-4 pb-4">
                     <div className="space-y-2">
-                      <Label className="text-sm font-medium">Question</Label>
-                      <div className="p-4 bg-muted rounded-lg">
-                        <p className="text-sm leading-relaxed whitespace-pre-wrap">{selectedQuestion.question}</p>
+                      <div className="flex items-center justify-between text-sm">
+                        <span className="font-medium">
+                          Question {currentQuestionIndex + 1} of {questions.length}
+                        </span>
+                        <span className="text-muted-foreground">{Math.round(progress)}%</span>
                       </div>
+                      <Progress value={progress} className="h-2" />
+                    </div>
+                  </CardContent>
+                </Card>
+
+                {/* Question Card */}
+                <Card>
+                  <CardHeader>
+                    <div className="flex items-start justify-between">
+                      <div className="space-y-2">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <Badge variant="outline">
+                            Question #{currentQuestion.questionNumber}
+                          </Badge>
+                          <Badge variant="outline" className="capitalize">
+                            {currentQuestion.type}
+                          </Badge>
+                          <Badge className={getDifficultyColor(currentQuestion.difficulty)}>
+                            {currentQuestion.difficulty}
+                          </Badge>
+                          <Badge variant="secondary">
+                            {currentQuestion.points} {currentQuestion.points === 1 ? 'point' : 'points'}
+                          </Badge>
+                          {currentQuestion.section && (
+                            <Badge variant="outline">
+                              Section {currentQuestion.section}
+                            </Badge>
+                          )}
+                        </div>
+                      </div>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => handleEditQuestion(currentQuestion._id)}
+                      >
+                        <Edit2 className="h-3.5 w-3.5 mr-1.5" />
+                        Edit
+                      </Button>
+                    </div>
+                  </CardHeader>
+                  <CardContent className="space-y-6">
+                    {/* Instruction Text */}
+                    {currentQuestion.instructionText && (
+                      <div className="p-4 bg-gray-50 rounded-lg border">
+                        <Label className="text-sm font-semibold text-gray-700 mb-2 block">
+                          Instructions
+                        </Label>
+                        <p className="text-sm text-gray-700 whitespace-pre-wrap">
+                          {currentQuestion.instructionText}
+                        </p>
+                      </div>
+                    )}
+
+                    {/* Passage */}
+                    {currentQuestion.passage && (
+                      <div className="space-y-3">
+                        <div className="flex items-center gap-2">
+                          <BookOpen className="h-5 w-5 text-gray-700" />
+                          <Label className="text-sm font-semibold text-gray-700">
+                            Reading Passage
+                          </Label>
+                        </div>
+                        <div className="p-4 bg-white rounded-lg border">
+                          <div className="prose prose-sm max-w-none">
+                            <p className="text-sm leading-relaxed whitespace-pre-wrap">
+                              {currentQuestion.passage}
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Audio Player */}
+                    {currentQuestion.audioFile?.url && (
+                      <div className="space-y-3">
+                        <div className="flex items-center gap-2">
+                          <Volume2 className="h-5 w-5 text-gray-700" />
+                          <Label className="text-sm font-semibold text-gray-700">
+                            Audio
+                          </Label>
+                        </div>
+                        <AudioPlayer
+                          src={currentQuestion.audioFile.url}
+                          title={currentQuestion.audioFile.originalName || `Question ${currentQuestionIndex + 1} Audio`}
+                          showDownload={false}
+                          className="w-full"
+                        />
+                      </div>
+                    )}
+
+                    {/* Image */}
+                    {currentQuestion.imageFile?.url && (
+                      <div className="space-y-3">
+                        <div className="flex items-center gap-2">
+                          <ImageIcon className="h-5 w-5 text-gray-700" />
+                          <Label className="text-sm font-semibold text-gray-700">
+                            Image
+                          </Label>
+                        </div>
+                        <div className="rounded-lg border overflow-hidden">
+                          <img
+                            src={currentQuestion.imageFile.url}
+                            alt={currentQuestion.imageFile.originalName || 'Question image'}
+                            className="w-full h-auto max-h-96 object-contain"
+                          />
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Question Text */}
+                    <div className="space-y-3">
+                      <Label className="text-base font-semibold text-gray-900">
+                        Question
+                      </Label>
+                      <p className="text-sm leading-relaxed whitespace-pre-wrap">
+                        {currentQuestion.question}
+                      </p>
                     </div>
 
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="space-y-2">
-                        <Label className="text-sm font-medium">Type</Label>
-                        <p className="text-sm capitalize">{selectedQuestion.type}</p>
-                      </div>
-
-                      <div className="space-y-2">
-                        <Label className="text-sm font-medium">Sub Type</Label>
-                        <p className="text-sm capitalize">{selectedQuestion.subType?.replace('-', ' ')}</p>
-                      </div>
-                    </div>
-
-                    <div className="grid grid-cols-3 gap-4">
-                      <div className="space-y-2">
-                        <Label className="text-sm font-medium">Points</Label>
-                        <p className="text-sm">{selectedQuestion.points}</p>
-                      </div>
-
-                      <div className="space-y-2">
-                        <Label className="text-sm font-medium">Difficulty</Label>
-                        <Badge variant={selectedQuestion.difficulty === 'hard' ? 'destructive' : selectedQuestion.difficulty === 'medium' ? 'default' : 'secondary'}>
-                          {selectedQuestion.difficulty}
-                        </Badge>
-                      </div>
-
-                      <div className="space-y-2">
-                        <Label className="text-sm font-medium">Section</Label>
-                        <p className="text-sm">Section {selectedQuestion.section}</p>
-                      </div>
-                    </div>
-
-                    {selectedQuestion.options && selectedQuestion.options.length > 0 && (
-                      <div className="space-y-2">
-                        <Label className="text-sm font-medium">Options</Label>
-                        <div className="space-y-2">
-                          {selectedQuestion.options.map((option, index) => (
-                            <div
-                              key={index}
-                              className={`flex items-center gap-2 p-3 rounded-lg border ${
-                                option === selectedQuestion.correctAnswer
+                    {/* Options for Multiple Choice */}
+                    {currentQuestion.subType === 'multiple-choice' && currentQuestion.options && currentQuestion.options.length > 0 && (
+                      <div className="space-y-3">
+                        <Label className="text-sm font-semibold text-gray-700">
+                          Options
+                        </Label>
+                        <RadioGroup value={currentQuestion.correctAnswer}>
+                          <div className="space-y-2">
+                            {currentQuestion.options.map((option, index) => (
+                              <div
+                                key={index}
+                                className={`flex items-center space-x-3 p-3 rounded-lg border ${option === currentQuestion.correctAnswer
                                   ? 'bg-green-50 border-green-200'
-                                  : 'bg-muted'
-                              }`}
-                            >
-                              <div className="flex h-6 w-6 items-center justify-center rounded-full bg-primary text-primary-foreground text-xs font-semibold">
-                                {String.fromCharCode(65 + index)}
+                                  : 'bg-white'
+                                  }`}
+                              >
+                                <RadioGroupItem value={option} id={`option-${index}`} disabled />
+                                <Label
+                                  htmlFor={`option-${index}`}
+                                  className="flex-1 cursor-pointer text-sm"
+                                >
+                                  <span className="font-semibold mr-2">
+                                    {String.fromCharCode(65 + index)}.
+                                  </span>
+                                  {option}
+                                </Label>
+                                {option === currentQuestion.correctAnswer && (
+                                  <Badge variant="default" className="bg-green-600">
+                                    <CheckCircle2 className="h-3 w-3 mr-1" />
+                                    Correct
+                                  </Badge>
+                                )}
                               </div>
-                              <span className="text-sm flex-1">{option}</span>
-                              {option === selectedQuestion.correctAnswer && (
-                                <Badge variant="default" className="bg-green-600">
-                                  Correct
-                                </Badge>
-                              )}
+                            ))}
+                          </div>
+                        </RadioGroup>
+                      </div>
+                    )}
+
+                    {/* Sub Questions */}
+                    {currentQuestion.hasSubQuestions && currentQuestion.subQuestions && currentQuestion.subQuestions.length > 0 && (
+                      <div className="space-y-4 pt-4">
+                        <Label className="text-base font-semibold text-gray-900">
+                          Sub Questions ({currentQuestion.subQuestions.length})
+                        </Label>
+                        <div className="space-y-4">
+                          {currentQuestion.subQuestions.map((subQ, subIndex) => (
+                            <div key={subQ._id || subIndex} className="p-4 bg-white rounded-lg border">
+                              <div className="space-y-3">
+                                <div className="flex items-start justify-between">
+                                  <div className="flex items-center gap-2">
+                                    <Badge variant="outline" className="text-xs">
+                                      #{subQ.subQuestionNumber}
+                                    </Badge>
+                                    <Badge variant="secondary" className="text-xs">
+                                      {subQ.points} {subQ.points === 1 ? 'point' : 'points'}
+                                    </Badge>
+                                    <Badge variant="outline" className="text-xs capitalize">
+                                      {subQ.subQuestionType}
+                                    </Badge>
+                                  </div>
+                                </div>
+
+                                <p className="text-sm">{subQ.question}</p>
+
+                                {/* Sub Question Options */}
+                                {subQ.subQuestionType === 'multiple-choice' && subQ.options && subQ.options.length > 0 && (
+                                  <RadioGroup value={subQ.correctAnswer}>
+                                    <div className="space-y-2">
+                                      {subQ.options.map((option, optIndex) => (
+                                        <div
+                                          key={optIndex}
+                                          className={`flex items-center space-x-3 p-2 rounded border text-sm ${option === subQ.correctAnswer
+                                            ? 'bg-green-50 border-green-200'
+                                            : 'bg-gray-50'
+                                            }`}
+                                        >
+                                          <RadioGroupItem value={option} id={`sub-${subIndex}-opt-${optIndex}`} disabled />
+                                          <Label
+                                            htmlFor={`sub-${subIndex}-opt-${optIndex}`}
+                                            className="flex-1 cursor-pointer text-xs"
+                                          >
+                                            <span className="font-semibold mr-2">
+                                              {String.fromCharCode(65 + optIndex)}.
+                                            </span>
+                                            {option}
+                                          </Label>
+                                          {option === subQ.correctAnswer && (
+                                            <Badge variant="default" className="bg-green-600 text-xs">
+                                              <CheckCircle2 className="h-2.5 w-2.5 mr-0.5" />
+                                              Correct
+                                            </Badge>
+                                          )}
+                                        </div>
+                                      ))}
+                                    </div>
+                                  </RadioGroup>
+                                )}
+
+                                {/* True/False */}
+                                {subQ.subQuestionType === 'true-false' && (
+                                  <div className="space-y-2">
+                                    <RadioGroup value={subQ.correctAnswer}>
+                                      {['True', 'False', 'Not Given'].map((option) => (
+                                        <div
+                                          key={option}
+                                          className={`flex items-center space-x-3 p-2 rounded border text-sm ${option === subQ.correctAnswer
+                                            ? 'bg-green-50 border-green-200'
+                                            : 'bg-gray-50'
+                                            }`}
+                                        >
+                                          <RadioGroupItem value={option} id={`sub-${subIndex}-${option}`} disabled />
+                                          <Label htmlFor={`sub-${subIndex}-${option}`} className="flex-1 text-xs">
+                                            {option}
+                                          </Label>
+                                          {option === subQ.correctAnswer && (
+                                            <Badge variant="default" className="bg-green-600 text-xs">
+                                              <CheckCircle2 className="h-2.5 w-2.5 mr-0.5" />
+                                              Correct
+                                            </Badge>
+                                          )}
+                                        </div>
+                                      ))}
+                                    </RadioGroup>
+                                  </div>
+                                )}
+
+                                {/* Fill in the Blank / Short Answer */}
+                                {(subQ.subQuestionType === 'fill-blank' || subQ.subQuestionType === 'short-answer') && subQ.correctAnswer && (
+                                  <div className="p-3 bg-green-50 border border-green-200 rounded">
+                                    <Label className="text-xs font-medium text-green-700 mb-1 block">
+                                      Correct Answer
+                                    </Label>
+                                    <p className="text-sm font-medium">{subQ.correctAnswer}</p>
+                                  </div>
+                                )}
+
+                                {/* Explanation */}
+                                {subQ.explanation && (
+                                  <div className="p-2 bg-blue-50 border border-blue-200 rounded">
+                                    <Label className="text-xs font-medium text-blue-700 mb-1 block">
+                                      Explanation
+                                    </Label>
+                                    <p className="text-xs text-blue-900">{subQ.explanation}</p>
+                                  </div>
+                                )}
+                              </div>
                             </div>
                           ))}
                         </div>
                       </div>
                     )}
 
-                    {selectedQuestion.tags && selectedQuestion.tags.length > 0 && (
-                      <div className="space-y-2">
-                        <Label className="text-sm font-medium">Tags</Label>
-                        <div className="flex flex-wrap gap-2">
-                          {selectedQuestion.tags.map((tag, index) => (
-                            <Badge key={index} variant="outline">{tag}</Badge>
-                          ))}
-                        </div>
+                    {/* Answer for other question types */}
+                    {!currentQuestion.hasSubQuestions && (currentQuestion.subType === 'fill-blank' || currentQuestion.subType === 'short-answer') && currentQuestion.correctAnswer && (
+                      <div className="p-4 bg-green-50 border border-green-200 rounded-lg">
+                        <Label className="text-sm font-semibold text-green-700 mb-2 block">
+                          Correct Answer
+                        </Label>
+                        <p className="text-sm font-medium">{currentQuestion.correctAnswer}</p>
                       </div>
                     )}
+                  </CardContent>
+                </Card>
 
-                    <div className="space-y-2">
-                      <Label className="text-sm font-medium">Marking Type</Label>
-                      <Badge variant={selectedQuestion.markingType === 'auto' ? 'default' : 'secondary'}>
-                        {selectedQuestion.markingType === 'auto' ? 'Auto-graded' : 'Manual grading'}
-                      </Badge>
-                    </div>
-
-                    <div className="space-y-2">
-                      <Label className="text-sm font-medium">Status</Label>
-                      <Badge variant={selectedQuestion.isActive ? 'default' : 'secondary'}>
-                        {selectedQuestion.isActive ? 'Active' : 'Inactive'}
-                      </Badge>
-                    </div>
-
-                    <div className="pt-4 border-t space-y-2">
-                      <div className="grid grid-cols-2 gap-4 text-xs text-muted-foreground">
-                        <div>
-                          <p className="font-medium">Created by</p>
-                          <p>{selectedQuestion.createdBy?.firstName} {selectedQuestion.createdBy?.lastName}</p>
-                        </div>
-                        <div>
-                          <p className="font-medium">Created at</p>
-                          <p>{new Date(selectedQuestion.createdAt).toLocaleString()}</p>
-                        </div>
+                {/* Navigation Buttons */}
+                <Card>
+                  <CardContent className="pt-4 pb-4">
+                    <div className="flex items-center justify-between">
+                      <Button
+                        variant="outline"
+                        onClick={handlePrevious}
+                        disabled={currentQuestionIndex === 0}
+                      >
+                        <ArrowLeft className="mr-2 h-4 w-4" />
+                        Previous
+                      </Button>
+                      <div className="text-sm text-muted-foreground">
+                        {currentQuestionIndex + 1} / {questions.length}
                       </div>
+                      <Button
+                        variant="outline"
+                        onClick={handleNext}
+                        disabled={currentQuestionIndex >= questions.length - 1}
+                      >
+                        Next
+                        <ArrowRight className="ml-2 h-4 w-4" />
+                      </Button>
                     </div>
-                  </div>
-                </>
-              )}
-            </div>
-          )}
-
-          <DialogFooter>
-            <Button variant="outline" onClick={handleCloseQuestionDialog}>
-              Close
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
+                  </CardContent>
+                </Card>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
     </div>
   );
 }
