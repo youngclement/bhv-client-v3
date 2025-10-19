@@ -89,6 +89,22 @@ class AuthService {
     this.removeToken();
   }
 
+  getCurrentUser(): User | null {
+    if (typeof window === 'undefined') return null;
+    
+    const token = this.getToken();
+    if (!token) return null;
+    
+    try {
+      // Decode JWT token to get user info
+      const payload = JSON.parse(atob(token.split('.')[1]));
+      return payload.user || null;
+    } catch (error) {
+      console.error('Failed to decode token:', error);
+      return null;
+    }
+  }
+
   private async authenticatedRequest(endpoint: string, options: RequestInit = {}): Promise<Response> {
     const token = this.getToken();
     if (!token) {

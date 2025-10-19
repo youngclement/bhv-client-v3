@@ -621,7 +621,7 @@ export default function TeacherSubmissionsPage() {
 
                 <div className="flex items-center gap-1">
                   {Array.from({ length: Math.min(5, data.pagination.pages) }, (_, i) => {
-                    let pageNum;
+                    let pageNum: number;
                     if (data.pagination.pages <= 5) {
                       pageNum = i + 1;
                     } else if (currentPage <= 3) {

@@ -286,7 +286,7 @@ export default function TakeTestPage() {
         if (questionData && questionData.subQuestions) {
           const subQuestion = questionData.subQuestions.find(sq =>
             sq.subQuestionNumber === subQuestionNumber ||
-            questionData.subQuestions!.indexOf(sq) === (subQuestionNumber - 1)
+            questionData!.subQuestions!.indexOf(sq) === (subQuestionNumber - 1)
           );
 
           if (subQuestion && subQuestion._id) {
