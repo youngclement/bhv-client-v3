@@ -14,7 +14,7 @@ interface AuthResponse {
 }
 
 class AuthService {
-  private baseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api';
+  private baseUrl = process.env.NEXT_PUBLIC_API_URL || "";
   private tokenKey = 'auth_token';
 
   getToken(): string | null {
